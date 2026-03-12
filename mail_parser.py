@@ -123,6 +123,8 @@ def _load_state():
         _state_path(),
         {
             'processed_keys': {},
+            'message_links': {},
+            'subject_links': {},
             'last_run': None,
             'last_summary': {},
         },
@@ -134,6 +136,17 @@ def _save_state(state):
     if len(processed) > 2000:
         ordered = sorted(processed.items(), key=lambda x: x[1], reverse=True)[:2000]
         state['processed_keys'] = dict(ordered)
+
+    message_links = state.get('message_links') or {}
+    if len(message_links) > 5000:
+        ordered = sorted(message_links.items(), key=lambda x: str(x[1].get('ts') or ''), reverse=True)[:5000]
+        state['message_links'] = dict(ordered)
+
+    subject_links = state.get('subject_links') or {}
+    if len(subject_links) > 2000:
+        ordered = sorted(subject_links.items(), key=lambda x: str(x[1].get('ts') or ''), reverse=True)[:2000]
+        state['subject_links'] = dict(ordered)
+
     _save_json(_state_path(), state)
 
 
@@ -144,9 +157,72 @@ def _remember_processed(key: str):
     _save_state(state)
 
 
-def _already_processed(key: str) -> bool:
+def _normalize_message_id(value: str | None) -> str:
+    raw = (value or '').strip().strip('<>').strip().lower()
+    return raw
+
+
+def _extract_reference_message_ids(msg) -> list[str]:
+    items: list[str] = []
+    for header in ('Message-ID', 'In-Reply-To', 'References'):
+        raw = str(msg.get(header) or '')
+        if not raw:
+            continue
+        for match in re.findall(r'<([^>]+)>', raw):
+            normalized = _normalize_message_id(match)
+            if normalized and normalized not in items:
+                items.append(normalized)
+        normalized_raw = _normalize_message_id(raw)
+        if normalized_raw and normalized_raw not in items and '@' in normalized_raw:
+            items.append(normalized_raw)
+    return items
+
+
+def _subject_link_key(from_email: str, subject: str) -> str | None:
+    normalized_subject = _normalize_subject(subject)
+    email_value = (from_email or '').strip().lower()
+    if not email_value or not normalized_subject:
+        return None
+    return f"{email_value}|{normalized_subject}"
+
+
+def _remember_ticket_thread(ticket_id: int, msg, from_email: str, subject: str):
     state = _load_state()
-    return key in (state.get('processed_keys') or {})
+    ts = _utc_now().isoformat()
+
+    message_links = state.setdefault('message_links', {})
+    for message_id in _extract_reference_message_ids(msg):
+        message_links[message_id] = {'ticket_id': int(ticket_id), 'ts': ts}
+
+    subject_key = _subject_link_key(from_email, subject)
+    if subject_key:
+        state.setdefault('subject_links', {})[subject_key] = {'ticket_id': int(ticket_id), 'ts': ts}
+
+    _save_state(state)
+
+
+def _find_ticket_by_thread_links(msg, from_email: str, subject: str):
+    state = _load_state()
+
+    for message_id in _extract_reference_message_ids(msg):
+        row = (state.get('message_links') or {}).get(message_id)
+        if not row:
+            continue
+        ticket_id = row.get('ticket_id')
+        if ticket_id:
+            ticket = SupportTicket.query.get(ticket_id)
+            if ticket:
+                return ticket
+
+    subject_key = _subject_link_key(from_email, subject)
+    if subject_key:
+        row = (state.get('subject_links') or {}).get(subject_key)
+        if row and row.get('ticket_id'):
+            ticket = SupportTicket.query.get(row.get('ticket_id'))
+            if ticket:
+                return ticket
+
+    return None
 
 
 def update_last_summary(summary: dict):
@@ -160,7 +236,7 @@ def _get_setting(key, default=''):
     row = Settings.query.filter_by(key=key).first()
     if row and row.value is not None:
         return row.value
-    return os.getenv(key, default)
+    return default
 
 
 def _get_bool_setting(key, default=False):
@@ -434,6 +510,10 @@ def _find_existing_ticket_for_email(msg, from_email: str, subject: str):
     if explicit_ticket_id:
         return SupportTicket.query.get(explicit_ticket_id)
 
+    linked_ticket = _find_ticket_by_thread_links(msg, from_email, subject)
+    if linked_ticket:
+        return linked_ticket
+
     normalized_subject = _normalize_subject(subject)
     if not normalized_subject:
         return None
@@ -529,6 +609,9 @@ def _create_ticket_message(ticket: SupportTicket, user: User, body: str, attachm
     )
     db.session.add(comment)
     db.session.flush()
+
+    if getattr(ticket, 'status', None) in {'Завершена', 'Закрыта'}:
+        ticket.status = 'Открыта'
     for item in attachments:
         db.session.add(
             TicketAttachment(
@@ -549,6 +632,7 @@ def _create_ticket_message(ticket: SupportTicket, user: User, body: str, attachm
             note='Комментарий добавлен почтовым парсером',
         )
     )
+    return comment
 
 
 def _create_ticket(from_email: str, from_name: str, subject: str, body: str, user: User, client_data: dict | None, attachments: list[dict], parser_department_id: int | None, sla_attention_hours, sla_default_hours):
@@ -594,11 +678,11 @@ def _create_ticket(from_email: str, from_name: str, subject: str, body: str, use
 
 
 def test_mail_connection():
-    server = _get_setting('mail_parser.imap_server', _get_setting('IMAP_SERVER', ''))
-    port = int(_get_setting('mail_parser.imap_port', _get_setting('IMAP_PORT', 993)) or 993)
+    server = _get_setting('mail_parser.imap_server', '')
+    port = int(_get_setting('mail_parser.imap_port', 993) or 993)
     use_ssl = _get_bool_setting('mail_parser.imap_use_ssl', True)
-    username = _get_setting('mail_parser.imap_username', _get_setting('IMAP_USERNAME', ''))
-    password = _get_setting('mail_parser.imap_password', _get_setting('IMAP_PASSWORD', ''))
+    username = _get_setting('mail_parser.imap_username', '')
+    password = _get_setting('mail_parser.imap_password', '')
     folder = (_get_setting('mail_parser.folder', 'INBOX') or 'INBOX').strip()
 
     if not server or not username or not password:
@@ -634,13 +718,12 @@ def check_incoming_emails(app, upload_folder, departments, sla_attention_hours, 
     try:
         with app.app_context():
             enabled = _get_bool_setting('mail_parser.enabled', False)
-            server = _get_setting('mail_parser.imap_server', _get_setting('IMAP_SERVER', ''))
-            port = int(_get_setting('mail_parser.imap_port', _get_setting('IMAP_PORT', 993)) or 993)
+            server = _get_setting('mail_parser.imap_server', '')
+            port = int(_get_setting('mail_parser.imap_port', 993) or 993)
             use_ssl = _get_bool_setting('mail_parser.imap_use_ssl', True)
-            username = (_get_setting('mail_parser.imap_username', _get_setting('IMAP_USERNAME', '')) or '').strip()
-            password = _get_setting('mail_parser.imap_password', _get_setting('IMAP_PASSWORD', ''))
+            username = (_get_setting('mail_parser.imap_username', '') or '').strip()
+            password = _get_setting('mail_parser.imap_password', '')
             folder = (_get_setting('mail_parser.folder', 'INBOX') or 'INBOX').strip()
-            subject_filter = (_get_setting('mail_parser.subject_filter', '') or '').strip().lower()
             only_unseen = _get_bool_setting('mail_parser.only_unseen', True)
             mark_seen = _get_bool_setting('mail_parser.mark_seen', True)
             strip_quotes = _get_bool_setting('mail_parser.strip_quotes', True)
@@ -723,6 +806,7 @@ def check_incoming_emails(app, upload_folder, departments, sla_attention_hours, 
 
                     if existing_ticket:
                         _create_ticket_message(existing_ticket, user, body, attachments)
+                        _remember_ticket_thread(existing_ticket.id, msg, from_email, subject)
                         summary['updated'] += 1
                         _append_log('success', 'comment', 'Комментарий добавлен в существующую заявку', ticket_id=existing_ticket.id, email=from_email, subject=subject)
                     else:
@@ -738,6 +822,7 @@ def check_incoming_emails(app, upload_folder, departments, sla_attention_hours, 
                             sla_attention_hours=sla_attention_hours,
                             sla_default_hours=sla_default_hours,
                         )
+                        _remember_ticket_thread(ticket.id, msg, from_email, subject)
                         summary['created'] += 1
                         _append_log('success', 'create', 'Создана заявка из письма', ticket_id=ticket.id, email=from_email, subject=subject)
 

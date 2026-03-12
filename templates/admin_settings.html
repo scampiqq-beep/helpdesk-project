@@ -308,7 +308,7 @@
         <div><label class="form-label">Логин</label><input class="form-control" type="text" name="imap_username" value="{{ mail_parser_settings.imap_username }}"></div>
         <div><label class="form-label">Пароль</label><input class="form-control" type="password" name="imap_password" value="{{ mail_parser_settings.imap_password }}"></div>
         <div><label class="form-label">Папка</label><input class="form-control" type="text" name="mail_folder" value="{{ mail_parser_settings.folder }}"></div>
-        <div><label class="form-label">Фильтр по теме</label><input class="form-control" type="text" name="subject_filter" value="{{ mail_parser_settings.subject_filter }}" placeholder="Оставьте пустым, чтобы обрабатывать все письма"></div>
+        <div><label class="form-label">Тема письма (информационно)</label><input class="form-control" type="text" name="subject_filter" value="{{ mail_parser_settings.subject_filter }}" placeholder="Оставьте пустым, чтобы обрабатывать все письма"></div>
         <div><label class="form-label">Отдел для новых заявок</label><select class="form-select" name="mail_parser_department_id"><option value="">Выбрать отдел</option>{% for dept in departments %}<option value="{{ dept.id }}" {% if mail_parser_settings.department_id|string == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>{% endfor %}</select></div>
         <div><label class="form-label">Интервал проверки, сек</label><input class="form-control" type="number" min="10" name="check_interval" value="{{ mail_parser_settings.check_interval }}"></div>
         <div><label class="form-label">Максимум писем за один запуск</label><input class="form-control" type="number" min="1" max="200" name="max_per_run" value="{{ mail_parser_settings.max_per_run }}"></div>
@@ -318,7 +318,7 @@
         <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="only_unseen" value="1" {% if mail_parser_settings.only_unseen %}checked{% endif %}> Обрабатывать только непрочитанные</label></div>
         <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="mark_seen" value="1" {% if mail_parser_settings.mark_seen %}checked{% endif %}> Помечать письма как прочитанные</label></div>
         <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="strip_quotes" value="1" {% if mail_parser_settings.strip_quotes %}checked{% endif %}> Обрезать цитаты и подписи в ответах</label></div>
-        <div style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" name="append_to_ticket" value="1" {% if mail_parser_settings.append_to_ticket %}checked{% endif %}> Добавлять письмо как комментарий, если в теме найден номер заявки (#123)</label></div>
+        <div style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" name="append_to_ticket" value="1" {% if mail_parser_settings.append_to_ticket %}checked{% endif %}> Добавлять ответ в существующую заявку по номеру, Message-ID / References и теме переписки</label></div>
         <div class="admin-actions"><button class="btn btn-action-primary" type="submit">Сохранить настройки парсера</button></div>
       </form>
       <div class="admin-grid-2">

@@ -102,8 +102,8 @@ class AdminSettingsService:
                 legacy.set_setting('MAIL_PORT', (request.form.get('MAIL_PORT') or '').strip())
                 legacy.set_setting('MAIL_USE_TLS', request.form.get('MAIL_USE_TLS', 'False'))
                 legacy.set_setting('MAIL_USERNAME', (request.form.get('MAIL_USERNAME') or '').strip())
-                pwd = (request.form.get('MAIL_PASSWORD') or '').strip()
-                if pwd:
+                pwd = request.form.get('MAIL_PASSWORD')
+                if pwd not in (None, ''):
                     legacy.set_setting('MAIL_PASSWORD', pwd)
                 db.session.commit()
                 flash('Почтовые настройки сохранены.', 'success')
@@ -379,8 +379,8 @@ class AdminSettingsService:
                 save_key('mail_parser.imap_port', (request.form.get('imap_port') or '').strip() or '993')
                 save_key('mail_parser.imap_use_ssl', 'true' if request.form.get('imap_use_ssl') else 'false')
                 save_key('mail_parser.imap_username', (request.form.get('imap_username') or '').strip())
-                pwd = (request.form.get('imap_password') or '').strip()
-                if pwd:
+                pwd = request.form.get('imap_password')
+                if pwd not in (None, ''):
                     save_key('mail_parser.imap_password', pwd)
                 save_key('mail_parser.folder', (request.form.get('mail_folder') or 'INBOX').strip() or 'INBOX')
                 save_key('mail_parser.subject_filter', (request.form.get('subject_filter') or '').strip())
