@@ -1,0 +1,13 @@
+<!-- templates/unverified.html -->
+{% extends "base.html" %}
+
+{% block content %}
+    <h2>Подтвердите ваш email</h2>
+    <p>На вашу почту <strong>{{ current_user.email }}</strong> было отправлено письмо с ссылкой для подтверждения.</p>
+    <p>Без подтверждения некоторые функции могут быть недоступны.</p>
+
+    <div class="mt-4">
+        <a href="{{ url_for('resend_verification') }}" class="btn btn-primary">Отправить письмо ещё раз</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary">Выйти</a>
+    </div>
+{% endblock %}

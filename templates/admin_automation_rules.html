@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% block title %}Автоматизация{% endblock %}
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+{% set condition_labels = {
+  'status_equals': 'Статус равен',
+  'priority_equals': 'Приоритет равен',
+  'category_equals': 'Категория равна',
+  'department_equals': 'Отдел равен',
+  'source_equals': 'Источник равен',
+  'customer_type_equals': 'Тип клиента равен',
+  'title_contains': 'Тема содержит',
+  'description_contains': 'Описание содержит',
+  'sla_breached': 'SLA нарушен'
+} %}
+{% set action_labels = {
+  'set_priority': 'Установить приоритет',
+  'set_department': 'Назначить отдел',
+  'set_assignee_email': 'Назначить исполнителя по email',
+  'add_tag': 'Добавить тег',
+  'add_internal_note': 'Добавить внутреннюю заметку',
+  'set_critical': 'Отметить как важную',
+  'set_status': 'Установить статус'
+} %}
+<style>
+.auto-shell{display:grid;gap:18px}
+.auto-hero,.auto-card{background:var(--surface,#fff);border:1px solid var(--border,#e5e7eb);border-radius:18px;padding:18px;box-shadow:var(--shadow-sm,0 10px 26px rgba(15,23,42,.05))}
+.auto-hero{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
+.auto-title{margin:0 0 8px;font-size:28px}.auto-sub{color:var(--muted,#6b7280);line-height:1.6}
+.auto-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
+.auto-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.auto-field,.builder-rows{display:grid;gap:8px}.auto-field label{font-weight:700}
+.auto-field input,.auto-field select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border,#d1d5db);background:var(--surface-2,var(--bg));color:var(--text,#111827)}
+.auto-kpi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.auto-stat{padding:14px;border-radius:14px;border:1px solid var(--border,#e5e7eb);background:var(--surface-2,var(--bg))}
+.auto-stat .v{font-size:28px;font-weight:800}.auto-stat .l{font-size:13px;color:var(--muted,#6b7280);margin-top:4px}
+.builder-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;padding:12px;border:1px solid var(--border,#e5e7eb);border-radius:14px;background:var(--surface-2,var(--bg))}
+.builder-row.condition{box-shadow:inset 4px 0 0 rgba(59,130,246,.55)}
+.builder-row.action{box-shadow:inset 4px 0 0 rgba(16,185,129,.55)}
+.auto-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.auto-btn-light{padding:9px 12px;border:1px solid var(--border,#d1d5db);border-radius:10px;background:transparent;color:inherit;cursor:pointer}
+.auto-checks{display:flex;flex-wrap:wrap;gap:16px}
+.auto-table{width:100%;border-collapse:collapse}.auto-table th,.auto-table td{padding:12px 10px;border-bottom:1px solid var(--border,#e5e7eb);text-align:left;vertical-align:top}.auto-table th{font-size:13px;color:var(--muted,#6b7280)}
+.auto-badge,.auto-chip{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:700}.auto-badge.on,.auto-chip.ok{background:rgba(22,163,74,.12);color:#166534}.auto-badge.off,.auto-chip.no{background:rgba(148,163,184,.18);color:var(--muted,#475569)}
+.auto-chip.warn{background:rgba(245,158,11,.15);color:#92400e}.auto-list{display:flex;flex-wrap:wrap;gap:8px}.auto-note{padding:14px 16px;border-radius:14px;border:1px solid var(--border,#e5e7eb);background:var(--surface-2,var(--bg))}
+.auto-two{display:grid;grid-template-columns:1fr 1fr;gap:18px}.auto-muted{color:var(--muted,#6b7280)}
+@media (max-width:1100px){.auto-hero,.auto-grid,.auto-two,.auto-form-grid{grid-template-columns:1fr}.builder-row{grid-template-columns:1fr}}
+</style>
+<div class="auto-shell">
+  <section class="auto-hero">
+    <div>
+      <h1 class="auto-title">Автоматизация заявок</h1>
+      <p class="auto-sub">Здесь настраиваются правила, которые автоматически меняют приоритет, статус, отдел, исполнителя и служебные заметки. Раздел нужен для маршрутизации заявок, ускорения обработки и сокращения ручных действий операторов.</p>
+      <div class="auto-note" style="margin-top:14px;">
+        <strong>Что можно сделать сейчас:</strong> собрать правило в визуальном конструкторе, подсветить условия и действия, проверить его на любой заявке, посмотреть симуляцию цепочки срабатываний и открыть журнал последних запусков.
+      </div>
+    </div>
+    <div class="auto-kpi">
+      <div class="auto-stat"><div class="v">{{ rules_count }}</div><div class="l">Всего правил</div></div>
+      <div class="auto-stat"><div class="v">{{ enabled_rules_count }}</div><div class="l">Активно</div></div>
+      <div class="auto-stat"><div class="v">{{ execution_logs|length }}</div><div class="l">Записей в журнале</div></div>
+      <div class="auto-stat"><div class="v">{{ recent_tickets|length }}</div><div class="l">Заявок для быстрого теста</div></div>
+    </div>
+  </section>
+
+  <div class="auto-grid">
+    <section class="auto-card">
+      <h2 style="margin:0 0 8px;">Визуальный конструктор правил</h2>
+      <div class="auto-sub">Добавляйте несколько условий и действий. Условия подсвечиваются синим, действия — зелёным. Система обработает их сверху вниз по приоритету.</div>
+      <form method="post" action="{{ url_for('admin_automation_create') }}" style="margin-top:16px;display:grid;gap:14px;">
+        <div class="auto-form-grid">
+          <div class="auto-field"><label for="key">Ключ</label><input id="key" type="text" name="key" placeholder="vip-high-priority" required></div>
+          <div class="auto-field"><label for="name">Название</label><input id="name" type="text" name="name" placeholder="VIP → высокий приоритет" required></div>
+          <div class="auto-field"><label for="priority">Приоритет выполнения</label><input id="priority" type="number" name="priority" value="100"></div>
+          <div class="auto-field"><label>&nbsp;</label><div class="auto-checks"><label><input type="checkbox" name="enabled" value="1" checked> Включено</label><label><input type="checkbox" name="stop_on_match" value="1"> Остановить цепочку после совпадения</label></div></div>
+        </div>
+
+        <div>
+          <div class="auto-actions" style="justify-content:space-between;margin-bottom:10px;"><strong>Условия</strong><button class="auto-btn-light" type="button" onclick="addBuilderRow('conditions')">+ Добавить условие</button></div>
+          <div id="conditions-builder" class="builder-rows">
+            <div class="builder-row condition">
+              <div class="auto-field"><label>Тип условия</label><select name="condition_type[]"><option value="">—</option>{% for item in condition_types %}<option value="{{ item }}">{{ condition_labels.get(item, item) }}</option>{% endfor %}</select></div>
+              <div class="auto-field"><label>Значение</label><input type="text" name="condition_value[]" placeholder="VIP / Новая / 1С"></div>
+              <button class="auto-btn-light" type="button" onclick="removeBuilderRow(this)">Удалить</button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="auto-actions" style="justify-content:space-between;margin-bottom:10px;"><strong>Действия</strong><button class="auto-btn-light" type="button" onclick="addBuilderRow('actions')">+ Добавить действие</button></div>
+          <div id="actions-builder" class="builder-rows">
+            <div class="builder-row action">
+              <div class="auto-field"><label>Тип действия</label><select name="action_type[]"><option value="">—</option>{% for item in action_types %}<option value="{{ item }}">{{ action_labels.get(item, item) }}</option>{% endfor %}</select></div>
+              <div class="auto-field"><label>Значение</label><input type="text" name="action_value[]" placeholder="critical / Сопровождение 1С / support@company.local"></div>
+              <button class="auto-btn-light" type="button" onclick="removeBuilderRow(this)">Удалить</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="auto-actions"><button class="btn btn-primary" type="submit">Сохранить правило</button></div>
+      </form>
+    </section>
+
+    <aside class="auto-card">
+      <h3 style="margin:0 0 8px;">Тест правила на любой заявке</h3>
+      <div class="auto-sub">Выберите любую недавнюю заявку и откройте симуляцию. Предпросмотр работает в безопасном режиме и не меняет данные тикета.</div>
+      <form method="get" action="{{ url_for('admin_automation_preview', ticket_id=0) }}" onsubmit="this.action=this.action.replace(/0$/, this.ticket_id.value || '0');" style="display:grid;gap:12px;margin-top:14px;">
+        <div class="auto-field">
+          <label for="ticket_id">Заявка</label>
+          <select name="ticket_id" id="ticket_id">
+            {% for ticket in recent_tickets %}
+            <option value="{{ ticket.id }}">#{{ ticket.id }} — {{ ticket.subject }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="auto-actions"><button class="btn btn-primary" type="submit">Запустить симуляцию</button></div>
+      </form>
+      <div class="auto-note" style="margin-top:16px;">
+        <strong>Подсказка:</strong> симуляция показывает последовательность проверок, совпавшие правила, итоговые изменения и журнал выполнения без записи в заявку.
+      </div>
+    </aside>
+  </div>
+
+  <div class="auto-two">
+    <section class="auto-card">
+      <h3 style="margin:0 0 12px;">Существующие правила</h3>
+      <div style="overflow:auto;">
+        <table class="auto-table">
+          <thead><tr><th>Правило</th><th>Условия</th><th>Действия</th><th>Состояние</th><th></th></tr></thead>
+          <tbody>
+          {% for rule in rules %}
+            {% set enabled = (rule.enabled if rule.enabled is defined else rule['enabled']) %}
+            {% set conditions = rule.conditions if rule.conditions is defined else rule['conditions'] %}
+            {% set actions = rule.actions if rule.actions is defined else rule['actions'] %}
+            <tr>
+              <td><strong>{{ rule.name if rule.name is defined else rule['name'] }}</strong><div class="auto-muted"><code>{{ rule.key if rule.key is defined else rule['key'] }}</code> · приоритет {{ rule.priority if rule.priority is defined else rule['priority'] }}</div></td>
+              <td><div class="auto-list">{% for item in conditions %}{% set cond_type = item.type if item.type is defined else item['type'] %}{% set cond_value = item.value if item.value is defined else item.get('value') %}<span class="auto-chip warn">{{ condition_labels.get(cond_type, cond_type) }}{% if cond_value not in [None, ''] %}: {{ cond_value }}{% endif %}</span>{% else %}<span class="auto-muted">—</span>{% endfor %}</div></td>
+              <td><div class="auto-list">{% for item in actions %}{% set action_type = item.type if item.type is defined else item['type'] %}{% set action_value = item.value if item.value is defined else item.get('value') %}<span class="auto-chip ok">{{ action_labels.get(action_type, action_type) }}{% if action_value not in [None, ''] %}: {{ action_value }}{% endif %}</span>{% else %}<span class="auto-muted">—</span>{% endfor %}</div></td>
+              <td><span class="auto-badge {{ 'on' if enabled else 'off' }}">{{ 'Включено' if enabled else 'Выключено' }}</span></td>
+              <td>
+                <div class="auto-actions" style="justify-content:flex-end;">
+                  <form method="post" action="{{ url_for('admin_automation_toggle', rule_key=(rule.key if rule.key is defined else rule['key'])) }}"><button class="auto-btn-light" type="submit">{{ 'Выключить' if enabled else 'Включить' }}</button></form>
+                  <form method="post" action="{{ url_for('admin_automation_delete', rule_key=(rule.key if rule.key is defined else rule['key'])) }}" onsubmit="return confirm('Удалить правило?');"><button class="auto-btn-light" type="submit">Удалить</button></form>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="auto-muted">Правил пока нет.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="auto-card">
+      <h3 style="margin:0 0 8px;">Лог выполнения правил</h3>
+      <div class="auto-sub" style="margin-bottom:12px;">Журнал показывает последние симуляции и рабочие срабатывания: по какой заявке запускались правила, сколько совпадений найдено и применялись ли изменения.</div>
+      <div style="overflow:auto;">
+        <table class="auto-table">
+          <thead><tr><th>Время</th><th>Источник</th><th>Заявка</th><th>Совпадения</th><th>Изменения</th></tr></thead>
+          <tbody>
+          {% for row in execution_logs %}
+            <tr>
+              <td>{{ row.created_at or '—' }}</td>
+              <td>{{ 'Симуляция' if row.source == 'preview' else 'Рабочий запуск' }}</td>
+              <td>{% if row.ticket_id %}<a href="{{ url_for('admin_automation_preview', ticket_id=row.ticket_id) }}">#{{ row.ticket_id }}</a>{% else %}—{% endif %}<div class="auto-muted">{{ row.ticket_subject or '' }}</div></td>
+              <td>{{ (row.matched_rules or [])|length }}</td>
+              <td>{{ 'Да' if row.applied else 'Нет, только просмотр' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="auto-muted">Журнал пока пуст.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const conditionOptions = `{% for item in condition_types %}<option value="{{ item }}">{{ condition_labels.get(item, item) }}</option>{% endfor %}`;
+const actionOptions = `{% for item in action_types %}<option value="{{ item }}">{{ action_labels.get(item, item) }}</option>{% endfor %}`;
+function addBuilderRow(type){
+  const host = document.getElementById(type === 'conditions' ? 'conditions-builder' : 'actions-builder');
+  const row = document.createElement('div');
+  row.className = 'builder-row ' + (type === 'conditions' ? 'condition' : 'action');
+  row.innerHTML = type === 'conditions'
+    ? `<div class="auto-field"><label>Тип условия</label><select name="condition_type[]"><option value="">—</option>${conditionOptions}</select></div><div class="auto-field"><label>Значение</label><input type="text" name="condition_value[]" placeholder="VIP / Новая / 1С"></div><button class="auto-btn-light" type="button" onclick="removeBuilderRow(this)">Удалить</button>`
+    : `<div class="auto-field"><label>Тип действия</label><select name="action_type[]"><option value="">—</option>${actionOptions}</select></div><div class="auto-field"><label>Значение</label><input type="text" name="action_value[]" placeholder="critical / Сопровождение 1С / support@company.local"></div><button class="auto-btn-light" type="button" onclick="removeBuilderRow(this)">Удалить</button>`;
+  host.appendChild(row);
+}
+function removeBuilderRow(btn){
+  const host = btn.closest('.builder-rows');
+  if(host && host.children.length === 1){ return; }
+  btn.closest('.builder-row').remove();
+}
+</script>
+{% endblock %}

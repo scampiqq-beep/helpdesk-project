@@ -1,0 +1,584 @@
+{% extends "base.html" %}
+
+{% block title %}Пользователи{% endblock %}
+{% block page_title %}Пользователи{% endblock %}
+
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<div class="card shadow-sm">
+  <div class="card-body p-3">
+
+    <!-- Jira/Zendesk style toolbar -->
+    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+    {% if is_admin %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_dashboard') }}">Панель управления</a>
+    {% endif %}
+    {% if can_manage_users %}
+      <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#addUserModal">Добавить пользователя</button>
+    {% endif %}
+  </div>
+
+      <form method="GET" class="d-flex flex-wrap gap-2 align-items-center">
+        <div class="input-group input-group-sm" style="width: 340px;">
+          <span class="input-group-text">🔎</span>
+          <input type="text" class="form-control" name="q" value="{{ q or '' }}" placeholder="Поиск: email, логин, имя">
+        </div>
+
+        <select class="form-select form-select-sm" name="role" style="width: 170px;">
+          <option value="" {% if not role_filter %}selected{% endif %}>Все роли</option>
+          <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Админ</option>
+          <option value="operator" {% if role_filter == 'operator' %}selected{% endif %}>Оператор</option>
+          <option value="client" {% if role_filter == 'client' %}selected{% endif %}>Клиент</option>
+        </select>
+
+        <select class="form-select form-select-sm" name="per_page" style="width: 110px;">
+          {% for n in [10,25,50,100] %}
+            <option value="{{n}}" {% if per_page == n %}selected{% endif %}>{{n}} / стр</option>
+          {% endfor %}
+        </select>
+
+        <input type="hidden" name="sort" value="{{ sort or '' }}">
+        <input type="hidden" name="dir" value="{{ direction or '' }}">
+        <button class="btn btn-sm btn-outline-primary" type="submit">Применить</button>
+        {% if q or role_filter %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_users', sort=sort, dir=direction, per_page=per_page) }}">Сброс</a>
+        {% endif %}
+      </form>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-2">
+      <div class="small text-muted">
+        {% if pagination %}
+          Найдено: <strong>{{ pagination.total }}</strong>
+        {% else %}
+          Всего пользователей: <strong>{{ users|length }}</strong>
+        {% endif %}
+      </div>
+      <div class="small text-muted">
+        {% if pagination %}
+          Страница <strong>{{ pagination.page }}</strong> из <strong>{{ pagination.pages or 1 }}</strong>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Add user (modal) -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Новый пользователь</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <form method="POST" class="row g-2 p-3" id="addUserForm" action="{{ url_for('admin_users', q=q, role=role_filter, sort=sort, dir=direction, page=page, per_page=per_page) }}">
+        <input type="hidden" name="action" value="add_user">
+
+        {% if is_admin %}
+          <div class="col-md-3">
+            <label class="form-label">Роль</label>
+            <select class="form-select" name="role" id="addUserRole">
+              {% set _r = (add_data.role if add_data and add_data.role else 'client') %}
+              <option value="client" {% if _r == 'client' %}selected{% endif %}>Клиент</option>
+              <option value="operator" {% if _r == 'operator' %}selected{% endif %}>Оператор</option>
+              <option value="admin" {% if _r == 'admin' %}selected{% endif %}>Админ</option>
+            </select>
+            <div class="form-text">По умолчанию — клиент. Оператор/админ: можно назначать отделы.</div>
+          </div>
+        {% else %}
+          <input type="hidden" name="role" value="client">
+          <input type="hidden" id="addUserRole" value="client">
+        {% endif %}
+
+        <div class="col-md-3">
+          <label class="form-label">Логин</label>
+          <input class="form-control {{ 'is-invalid' if add_errors and add_errors.get('username') }}" name="username" value="{{ (add_data.username if add_data else '') }}" placeholder="если пусто — возьмём email">
+          {% if add_errors and add_errors.get('username') %}
+            <div class="invalid-feedback">{{ add_errors.get('username') }}</div>
+          {% else %}
+            <div class="form-text">Только латиница/цифры/._- (лучше как email).</div>
+          {% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Email *</label>
+          <input type="email" class="form-control {{ 'is-invalid' if add_errors and add_errors.get('email') }}" name="email" value="{{ (add_data.email if add_data else '') }}" required>
+          {% if add_errors and add_errors.get('email') %}
+            <div class="invalid-feedback">{{ add_errors.get('email') }}</div>
+          {% else %}
+            <div class="form-text">Нужен для входа и уведомлений.</div>
+          {% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Пароль *</label>
+          <input type="password" class="form-control {{ 'is-invalid' if add_errors and add_errors.get('password') }}" name="password" required>
+          {% if add_errors and add_errors.get('password') %}
+            <div class="invalid-feedback">{{ add_errors.get('password') }}</div>
+          {% else %}
+            <div class="form-text">Минимум 6 символов.</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Фамилия</label>
+          <input class="form-control {{ 'is-invalid' if add_errors and add_errors.get('last_name') }}" name="last_name" value="{{ (add_data.last_name if add_data else '') }}">
+          {% if add_errors and add_errors.get('last_name') %}
+            <div class="invalid-feedback">{{ add_errors.get('last_name') }}</div>
+          {% else %}
+            <div class="form-text">Только буквы/дефис/пробел. Без ссылок.</div>
+          {% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Имя</label>
+          <input class="form-control {{ 'is-invalid' if add_errors and add_errors.get('name') }}" name="name" value="{{ (add_data.name if add_data else '') }}">
+          {% if add_errors and add_errors.get('name') %}
+            <div class="invalid-feedback">{{ add_errors.get('name') }}</div>
+          {% else %}
+            <div class="form-text">Например: Василий.</div>
+          {% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Отчество</label>
+          <input class="form-control {{ 'is-invalid' if add_errors and add_errors.get('patronymic') }}" name="patronymic" value="{{ (add_data.patronymic if add_data else '') }}">
+          {% if add_errors and add_errors.get('patronymic') %}
+            <div class="invalid-feedback">{{ add_errors.get('patronymic') }}</div>
+          {% else %}
+            <div class="form-text">Если нет — оставьте пустым.</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Телефон</label>
+          <input class="form-control {{ 'is-invalid' if add_errors and add_errors.get('phone') }}" name="phone" value="{{ (add_data.phone if add_data else '') }}" placeholder="+7XXXXXXXXXX">
+          {% if add_errors and add_errors.get('phone') %}
+            <div class="invalid-feedback">{{ add_errors.get('phone') }}</div>
+          {% else %}
+            <div class="form-text">Можно с +7, пробелы/скобки допускаются.</div>
+          {% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Организация</label>
+          <input class="form-control {{ 'is-invalid' if add_errors and add_errors.get('organization') }}" name="organization" value="{{ (add_data.organization if add_data else '') }}">
+          {% if add_errors and add_errors.get('organization') %}
+            <div class="invalid-feedback">{{ add_errors.get('organization') }}</div>
+          {% else %}
+            <div class="form-text">Без ссылок/HTML.</div>
+          {% endif %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Должность</label>
+          <input class="form-control" name="position" value="{{ (add_data.position if add_data else '') }}">
+          <div class="form-text">Опционально.</div>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">ИНН</label>
+          <input class="form-control {{ 'is-invalid' if add_errors and add_errors.get('inn') }}" name="inn" value="{{ (add_data.inn if add_data else '') }}" placeholder="10 или 12 цифр">
+          {% if add_errors and add_errors.get('inn') %}
+            <div class="invalid-feedback">{{ add_errors.get('inn') }}</div>
+          {% else %}
+            <div class="form-text">Проверяем контрольные цифры (РФ).</div>
+          {% endif %}
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Адрес</label>
+          <input class="form-control {{ 'is-invalid' if add_errors and add_errors.get('address') }}" name="address" value="{{ (add_data.address if add_data else '') }}">
+          {% if add_errors and add_errors.get('address') %}
+            <div class="invalid-feedback">{{ add_errors.get('address') }}</div>
+          {% else %}
+            <div class="form-text">До 300 символов, без ссылок/HTML.</div>
+          {% endif %}
+        </div>
+
+        {% if is_admin %}
+          <div class="col-12" id="addUserDepartmentsWrap" style="display:none;">
+            <label class="form-label small">Отделы (для оператора/админа)</label>
+            <select class="form-select form-select-sm" name="department_ids" multiple>
+              {% for d in departments %}
+                <option value="{{ d.id }}">{{ d.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Выберите 1+ отдел. Первый выбранный станет основным.</div>
+          </div>
+        {% endif %}
+
+        <div class="col-12" id="addUserEmailVerifiedWrap">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="addUserEmailVerified" name="email_verified">
+            <label class="form-check-label" for="addUserEmailVerified">
+              Email подтверждён (пропустить верификацию)
+            </label>
+          </div>
+          <div class="form-text">Полезно, когда создаёте клиента вручную (без письма подтверждения).</div>
+        </div>
+
+        <div class="col-12 pt-2 d-flex gap-2 justify-content-end">
+          <button class="btn btn-sm btn-primary" type="submit">Создать</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Users list styles (Jira/Zendesk-like) -->
+    <style>
+      .users-wrap { border: 1px solid rgba(0,0,0,.08); border-radius: 12px; overflow: hidden; }
+      .users-scroll { max-height: calc(100vh - 300px); overflow: auto; }
+      table.user-table { table-layout: fixed; width: 100%; }
+      table.user-table th, table.user-table td { padding: .45rem .55rem; font-size: 13px; line-height: 1.25; }
+      table.user-table td code { font-size: 12px; }
+      table.user-table th { white-space: nowrap; vertical-align: middle; font-weight: 600; background: #f6f7f9; }
+      table.user-table thead th { position: sticky; top: 0; z-index: 2; }
+      table.user-table td { vertical-align: middle; }
+      table.user-table td.wrap { white-space: normal; }
+      table.user-table td.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      table.user-table th a { color: inherit; text-decoration: none; }
+      table.user-table th a:hover { text-decoration: underline; }
+      table.user-table tbody tr:hover { background: rgba(13,110,253,.04); }
+
+      /* Alignment */
+      .cell-center { text-align: center; }
+      .cell-left { text-align: left; }
+
+      /* Actions: icons horizontally, no wrap */
+      .actions { display: inline-flex; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
+      .actions form { margin: 0; }
+      .icon-btn {
+        padding: 0;
+        width: 26px;
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        line-height: 1;
+        border-radius: 8px;
+      }
+
+      /* Compact role/verified chips */
+      .chip { display:inline-flex; align-items:center; justify-content:center; padding: 0 .5rem; height: 22px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+      .chip-admin { background:#ffe3e3; color:#b02a37; }
+      .chip-op { background:#e7f7ee; color:#146c43; }
+      .chip-client { background:#eef0f2; color:#495057; }
+      .chip-ok { background:#e7f7ee; color:#146c43; }
+      .chip-warn { background:#fff3cd; color:#997404; }
+      .chip-muted { background:#f1f3f5; color:#6c757d; }
+
+      /* Modal: чуть крупнее и читабельнее */
+      #addUserModal .modal-content { font-size: 15px; }
+      #addUserModal .form-label { font-size: 14px; font-weight: 600; }
+      #addUserModal .form-text { font-size: 12.5px; }
+    </style>
+
+    {% if open_add_modal %}
+      <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          try {
+            var el = document.getElementById('addUserModal');
+            if (el && window.bootstrap) {
+              var modal = bootstrap.Modal.getOrCreateInstance(el);
+              modal.show();
+            }
+          } catch (e) {}
+        });
+      </script>
+    {% endif %}
+
+    {% macro sort_href(key) -%}
+      {%- set next_dir = 'asc' if sort != key or direction == 'desc' else 'desc' -%}
+      {{ url_for('admin_users', q=q, role=role_filter, per_page=per_page, sort=key, dir=next_dir, page=1) }}
+    {%- endmacro %}
+    {% macro sort_icon(key) -%}
+      {%- if sort == key -%}
+        <span class="ms-1">{{ '▲' if direction == 'asc' else '▼' }}</span>
+      {%- endif -%}
+    {%- endmacro %}
+
+    <div class="users-wrap">
+      <div class="users-scroll">
+        <table class="table align-middle mb-0 user-table">
+          <colgroup>
+            <col style="width:5%;">
+            <col style="width:12%;">
+            <col style="width:18%;">
+            <col style="width:16%;">
+            <col style="width:8%;">
+            <col style="width:7%;">
+            <col style="width:18%;">
+            <col style="width:10%;">
+            {% if is_admin %}<col style="width:6%;">{% endif %}
+          </colgroup>
+          <thead>
+          <tr class="text-muted">
+            <th class="cell-center">
+              <a href="{{ sort_href('id') }}">ID{{ sort_icon('id') }}</a>
+            </th>
+            <th class="cell-left">Логин</th>
+            <th class="cell-left">Email</th>
+            <th class="cell-left">ФИО</th>
+            <th class="cell-center">
+              <a href="{{ sort_href('role') }}">Роль{{ sort_icon('role') }}</a>
+            </th>
+            <th class="cell-center">Вериф.</th>
+            <th class="cell-left">Отделы</th>
+            <th class="cell-left">
+              <a href="{{ sort_href('created_at') }}">Регистрация{{ sort_icon('created_at') }}</a>
+            </th>
+            {% if is_admin %}<th class="cell-center">⋯</th>{% endif %}
+          </tr>
+          </thead>
+          <tbody>
+          {% for u in users %}
+          <tr>
+            <td class="cell-center">{{ u.id }}</td>
+            <td class="ellipsis"><code>{{ u.username }}</code></td>
+            <td class="ellipsis">{{ u.email or '' }}</td>
+            <td class="wrap">{{ (u.last_name or '') ~ ' ' ~ (u.name or '') ~ ' ' ~ (u.patronymic or '') }}</td>
+            <td class="cell-center">
+              {% if u.role == 'admin' %}
+                <span class="chip chip-admin">Админ</span>
+              {% elif u.role == 'operator' %}
+                <span class="chip chip-op">Оператор</span>
+              {% else %}
+                <span class="chip chip-client">Клиент</span>
+              {% endif %}
+            </td>
+            <td class="cell-center">
+              {% if u.role == 'client' %}
+                {% if u.email_verified %}
+                  <span class="chip chip-ok">Да</span>
+                {% else %}
+                  <span class="chip chip-warn">Нет</span>
+                {% endif %}
+              {% else %}
+                <span class="chip chip-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="ellipsis" title="{% if u.role == 'admin' %}Все{% elif u.role == 'operator' %}{% if total_departments and u.departments and u.departments|length == total_departments %}Все{% else %}{{ u.departments|map(attribute='name')|join(', ') }}{% endif %}{% else %}—{% endif %}">
+              {% if u.role == 'admin' %}
+                Все
+              {% elif u.role == 'operator' %}
+                {% if total_departments and u.departments and u.departments|length == total_departments %}
+                  Все
+                {% elif u.departments and u.departments|length > 0 %}
+                  {{ u.departments|map(attribute='name')|join(', ') }}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.created_at %}
+                {{ u.created_at.strftime('%d.%m.%Y') }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            {% if is_admin %}
+            <td class="cell-center">
+              <div class="actions">
+                <button class="btn btn-outline-primary icon-btn" data-bs-toggle="modal" data-bs-target="#editUser{{ u.id }}" title="Редактировать" aria-label="Редактировать">✎</button>
+
+                <form method="POST" action="{{ url_for('admin_users', q=q, role=role_filter, sort=sort, dir=direction, page=page, per_page=per_page) }}">
+                  <input type="hidden" name="action" value="reset_user_password">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <button class="btn btn-outline-warning icon-btn" type="submit" title="Сбросить пароль" aria-label="Сбросить пароль" {% if u.id == current_user.id %}disabled{% endif %}>🔒</button>
+                </form>
+
+                <form method="POST" action="{{ url_for('admin_users', q=q, role=role_filter, sort=sort, dir=direction, page=page, per_page=per_page) }}" onsubmit="return confirm('Удалить пользователя {{ u.username }}?');">
+                  <input type="hidden" name="action" value="delete_user">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <button class="btn btn-outline-danger icon-btn" type="submit" title="Удалить" aria-label="Удалить" {% if u.id == current_user.id or u.role == 'admin' %}disabled{% endif %}>🗑</button>
+                </form>
+              </div>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if pagination and pagination.pages > 1 %}
+      <nav class="mt-3" aria-label="Пагинация">
+        <ul class="pagination pagination-sm mb-0 flex-wrap">
+          <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('admin_users', q=q, role=role_filter, sort=sort, dir=direction, per_page=per_page, page=pagination.prev_num if pagination.has_prev else 1) }}">‹</a>
+          </li>
+
+          {# windowed pages like Jira (…)
+             show: 1, last, current±2 #}
+          {% set p = pagination.page %}
+          {% set last = pagination.pages %}
+
+          {% for n in range(1, last+1) %}
+            {% if n == 1 or n == last or (n >= p-2 and n <= p+2) %}
+              <li class="page-item {% if n == p %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_users', q=q, role=role_filter, sort=sort, dir=direction, per_page=per_page, page=n) }}">{{ n }}</a>
+              </li>
+            {% elif n == 2 and p > 4 %}
+              <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% elif n == last-1 and p < last-3 %}
+              <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+          {% endfor %}
+
+          <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('admin_users', q=q, role=role_filter, sort=sort, dir=direction, per_page=per_page, page=pagination.next_num if pagination.has_next else pagination.pages) }}">›</a>
+          </li>
+        </ul>
+      </nav>
+    {% endif %}
+    {% if is_admin %}
+
+    <!-- Модалки вынесены за пределы таблицы (иначе ломается выравнивание колонок в некоторых браузерах) -->
+    {% for u in users %}
+    <div class="modal fade" id="editUser{{ u.id }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h6 class="modal-title">Редактирование: {{ u.username }}</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form method="POST" action="{{ url_for('admin_users', q=q, role=role_filter, sort=sort, dir=direction, page=page, per_page=per_page) }}">
+            <div class="modal-body">
+              <input type="hidden" name="action" value="edit_user">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <label class="form-label small">Роль</label>
+                  <select class="form-select form-select-sm role-select" name="role" data-target="#editUserDepartmentsWrap{{ u.id }}" data-verify="#editUserEmailVerifiedWrap{{ u.id }}">
+                    <option value="client" {% if u.role == 'client' %}selected{% endif %}>Клиент</option>
+                    <option value="operator" {% if u.role == 'operator' %}selected{% endif %}>Оператор</option>
+                    <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Админ</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Логин *</label>
+                  <input class="form-control form-control-sm" name="username" value="{{ u.username }}" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Email *</label>
+                  <input type="email" class="form-control form-control-sm" name="email" value="{{ u.email or '' }}" required>
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label small">Фамилия</label>
+                  <input class="form-control form-control-sm" name="last_name" value="{{ u.last_name or '' }}">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Имя</label>
+                  <input class="form-control form-control-sm" name="name" value="{{ u.name or '' }}">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Отчество</label>
+                  <input class="form-control form-control-sm" name="patronymic" value="{{ u.patronymic or '' }}">
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label small">Телефон</label>
+                  <input class="form-control form-control-sm" name="phone" value="{{ u.phone or '' }}">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Организация</label>
+                  <input class="form-control form-control-sm" name="organization" value="{{ u.organization or '' }}">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label small">Должность</label>
+                  <input class="form-control form-control-sm" name="position" value="{{ u.position or '' }}">
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label small">ИНН</label>
+                  <input class="form-control form-control-sm" name="inn" value="{{ u.inn or '' }}">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label small">Адрес</label>
+                  <input class="form-control form-control-sm" name="address" value="{{ u.address or '' }}">
+                </div>
+
+                <div class="col-12" id="editUserDepartmentsWrap{{ u.id }}" {% if u.role not in ['operator','admin'] %}style="display:none;"{% endif %}>
+                  <label class="form-label small">Отделы (для оператора/админа)</label>
+                  <select class="form-select form-select-sm" name="department_ids" multiple>
+                    {% for d in departments %}
+                      {% set selected = false %}
+                      {% for ud in u.departments %}
+                        {% if ud.id == d.id %}{% set selected = true %}{% endif %}
+                      {% endfor %}
+                      <option value="{{ d.id }}" {% if selected %}selected{% endif %}>{{ d.name }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="form-text">Первый выбранный станет основным.</div>
+                </div>
+
+                <div class="col-12" id="editUserEmailVerifiedWrap{{ u.id }}" {% if u.role != 'client' %}style="display:none;"{% endif %}>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="editUserEmailVerified{{ u.id }}" name="email_verified" {% if u.email_verified %}checked{% endif %}>
+                    <label class="form-check-label" for="editUserEmailVerified{{ u.id }}">
+                      Email подтверждён (пропустить верификацию)
+                    </label>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small">Новый пароль</label>
+                  <input type="password" class="form-control form-control-sm" name="new_password" placeholder="оставьте пустым, чтобы не менять">
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+              <button type="submit" class="btn btn-sm btn-primary">Сохранить</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+    {% endif %}
+
+<script>
+  (function(){
+    function syncAddForm(){
+      const role = document.getElementById('addUserRole');
+      const depWrap = document.getElementById('addUserDepartmentsWrap');
+      const verWrap = document.getElementById('addUserEmailVerifiedWrap');
+      if (!role || !verWrap) return;
+      // depWrap может отсутствовать (для операторов ТП доступно только добавление клиента)
+      const v = (role.value || 'client');
+      if (depWrap) depWrap.style.display = (v === 'operator' || v === 'admin') ? '' : 'none';
+      verWrap.style.display = (v === 'client') ? '' : 'none';
+    }
+
+    function syncSelect(selectEl){
+      const v = (selectEl.value || 'client');
+      const depSel = selectEl.getAttribute('data-target');
+      const verSel = selectEl.getAttribute('data-verify');
+      if (depSel){
+        const depWrap = document.querySelector(depSel);
+        if (depWrap) if (depWrap) depWrap.style.display = (v === 'operator' || v === 'admin') ? '' : 'none';
+      }
+      if (verSel){
+        const verWrap = document.querySelector(verSel);
+        if (verWrap) verWrap.style.display = (v === 'client') ? '' : 'none';
+      }
+    }
+
+    document.addEventListener('change', function(e){
+      if (e.target && e.target.id === 'addUserRole') syncAddForm();
+      if (e.target && e.target.classList && e.target.classList.contains('role-select')) syncSelect(e.target);
+    });
+
+    syncAddForm();
+    document.querySelectorAll('.role-select').forEach(syncSelect);
+  })();
+</script>
+  </section>
+</div>
+{% endblock %}

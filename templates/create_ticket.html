@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% from 'partials/svg.html' import svg %}
+
+{% block page_title %}Создать заявку
+<style>
+  .create-ticket .bb-editor{min-height:150px;}
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid ticket-view create-ticket">
+  <div class="ticket-layout" style="grid-template-columns:minmax(0,1fr)">
+    <div class="ticket-main">
+
+      <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between gap-2" style="flex-wrap:wrap;">
+          <div style="font-weight:750;">Создать заявку</div>
+        </div>
+
+        <div class="card-body">
+          <form method="POST" enctype="multipart/form-data" id="createTicketForm">
+            <input type="hidden" name="end_user_id" id="end_user_id" value="">
+
+            <!-- Данные клиента -->
+            <div class="section-title">Данные клиента</div>
+            <div class="row g-3">
+              {% if is_operator %}
+                <div class="col-md-4">
+                  <label class="form-label">ФИО клиента</label>
+                  <input class="form-control" type="text" name="client_name" id="client_name" value="{{ (form.client_name if form else '') or '' }}" placeholder="Иванов Иван Иванович">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Email клиента <span class="text-danger">*</span></label>
+                  <input class="form-control {% if errors and errors.get('client_email') %}is-invalid{% endif %}" type="email" name="client_email" id="client_email" value="{{ (form.client_email if form else '') or '' }}" placeholder="user@domain.ru" required>
+                  <div id="clientLookupStatus" class="form-text" style="display:none;"></div>
+                  {% if errors and errors.get('client_email') %}<div class="invalid-feedback">{{ errors.get('client_email') }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Телефон</label>
+                  <input class="form-control" type="text" name="client_phone" id="client_phone" value="{{ (form.client_phone if form else '') or '' }}" placeholder="+7…">
+                </div>
+              {% else %}
+                <div class="col-md-4">
+                  <label class="form-label">ФИО</label>
+                  <input class="form-control" type="text" name="client_name" id="client_name" value="{{ (current_user.last_name ~ ' ' ~ current_user.name ~ ' ' ~ current_user.patronymic).strip() if current_user else '' }}" readonly>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Email</label>
+                  <input class="form-control" type="email" name="client_email" id="client_email" value="{{ current_user.email if current_user else '' }}" readonly>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Телефон</label>
+                  <input class="form-control" type="text" name="client_phone" id="client_phone" value="{{ current_user.phone if current_user else '' }}">
+                </div>
+              {% endif %}
+            </div>
+
+            <hr class="divider" style="margin:18px 0">
+
+            <!-- Данные организации -->
+            <div class="section-title">Данные организации</div>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Организация <span class="text-danger">*</span></label>
+                <input class="form-control {% if errors and errors.get('organization') %}is-invalid{% endif %}" type="text" name="organization" id="organization" value="{{ (org_prefill.organization if org_prefill else '') or (form.organization if form else '') or '' }}" placeholder="ООО Ромашка" required>
+                <div class="form-text">Без ссылок/HTML. Пример: ООО Ромашка</div>
+                {% if errors and errors.get('organization') %}<div class="invalid-feedback">{{ errors.get('organization') }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">ИНН <span class="text-danger">*</span></label>
+                <input class="form-control {% if errors and errors.get('inn') %}is-invalid{% endif %}" type="text" name="inn" id="inn" value="{{ (org_prefill.inn if org_prefill else '') or (form.inn if form else '') or '' }}" placeholder="770…" required>
+                <div class="form-text">10 или 12 цифр</div>
+                {% if errors and errors.get('inn') %}<div class="invalid-feedback">{{ errors.get('inn') }}</div>{% endif %}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Адрес организации <span class="text-danger">*</span></label>
+                <input class="form-control {% if errors and errors.get('address') %}is-invalid{% endif %}" type="text" name="address" id="address" value="{{ (org_prefill.address if org_prefill else '') or (form.address if form else '') or '' }}" placeholder="Город, улица, дом" required>
+                <div class="form-text">Город, улица, дом</div>
+                {% if errors and errors.get('address') %}<div class="invalid-feedback">{{ errors.get('address') }}</div>{% endif %}
+              </div>
+            </div>
+
+            <hr class="divider" style="margin:18px 0">
+
+            <!-- Детали заявки -->
+            <div class="section-title">Детали заявки</div>
+            <div class="row g-3">
+              {# Категории убраны: все заявки — «обращения». Оставляем hidden для совместимости. #}
+              <input type="hidden" name="category_id" value="{{ default_issue_category.id if default_issue_category else '' }}">
+
+              {# Приоритеты отключены в системе. Оставляем скрытое значение для совместимости. #}
+              <input type="hidden" name="priority" value="normal">
+
+              <div class="col-12">
+                <label class="form-label">Тема <span class="text-danger">*</span></label>
+                <input class="form-control {% if errors and errors.get('subject') %}is-invalid{% endif %}" type="text" name="subject" value="{{ (form.subject if form else '') or '' }}" required>
+                {% if errors and errors.get('subject') %}<div class="invalid-feedback">{{ errors.get('subject') }}</div>{% endif %}
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <label class="form-label">Описание <span class="text-danger">*</span></label>
+
+              <!-- BBCode toolbar (same as ticket_detail comments) -->
+              <div class="bb-toolbar" role="toolbar">
+                <button type="button" class="bb-btn" data-cmd="bold"><b>B</b></button>
+                <button type="button" class="bb-btn" data-cmd="italic"><i>I</i></button>
+                <button type="button" class="bb-btn" data-cmd="strikeThrough"><s>S</s></button>
+                <button type="button" class="bb-btn" data-action="link">URL</button>
+                <button type="button" class="bb-btn" data-action="list">List</button>
+                <button type="button" class="bb-btn" data-action="quote">Quote</button>
+                <button type="button" class="bb-btn" data-action="code">Code</button>
+              </div>
+
+              <div id="ticketMessage" class="bb-editor" style="min-height:160px" contenteditable="true" data-placeholder="Опишите проблему…"></div>
+              {#
+                IMPORTANT:
+                Hidden required controls break browser validation ("not focusable").
+                Keep this field focusable but visually hidden off-screen.
+              #}
+              <textarea name="message" class="bb-hidden" id="ticketMessageHidden" required
+                        style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; opacity:0;">
+                {{ (form.message if form else '') or '' }}
+              </textarea>
+              {% if errors and errors.get('message') %}<div class="text-danger small mt-1">{{ errors.get('message') }}</div>{% endif %}
+            </div>
+
+            <div class="mt-3">
+              <label class="file-picker">
+                <span class="btn btn-secondary btn-sm">Выбрать файлы</span>
+                <input type="file" id="ticketFiles" name="files" multiple accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx,.xls,.xlsx,.txt">
+              </label>
+              <div id="ticketFilePreview" class="file-preview" style="display:none;"></div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2" style="flex-wrap:wrap;">
+              <button class="btn btn-primary" type="submit">Создать</button>
+              <a class="btn btn-ghost" href="{{ url_for('ticket_list') }}">Отмена</a>
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// === Visual BB editor (copied from ticket_detail, same behavior) ===
+function bbcodeToHtml(bb) {
+  if (!bb) return '';
+  let s = bb;
+  s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  s = s.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>');
+  s = s.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>');
+  s = s.replace(/\[s\]([\s\S]*?)\[\/s\]/gi, '<s>$1</s>');
+  s = s.replace(/\[code\]([\s\S]*?)\[\/code\]/gi, '<pre class="bb-code">$1</pre>');
+  s = s.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote class="bb-quote">$1</blockquote>');
+  s = s.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener">$2</a>');
+  s = s.replace(/\[url\]([^\[]+)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\[list\]([\s\S]*?)\[\/list\]/gi, (m, inner) => {
+    const items = inner.split(/\[\*\]/).map(x => x.trim()).filter(Boolean);
+    return '<ul>' + items.map(i => `<li>${i}</li>`).join('') + '</ul>';
+  });
+  s = s.replace(/\r\n|\r|\n/g, '<br>');
+  return s;
+}
+
+function htmlToBbcode(html) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html || '';
+
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node.nodeValue;
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'br') return '\n';
+    if (tag === 'strong' || tag === 'b') return `[b]${children(node)}[/b]`;
+    if (tag === 'em' || tag === 'i') return `[i]${children(node)}[/i]`;
+    if (tag === 's' || tag === 'strike' || tag === 'del') return `[s]${children(node)}[/s]`;
+    if (tag === 'a') {
+      const href = node.getAttribute('href') || '';
+      const txt = children(node) || href;
+      return href ? `[url=${href}]${txt}[/url]` : txt;
+    }
+    if (tag === 'blockquote') return `[quote]${children(node)}[/quote]\n`;
+    if (tag === 'pre') return `[code]${node.textContent || ''}[/code]\n`;
+    if (tag === 'ul') {
+      const li = Array.from(node.querySelectorAll(':scope > li')).map(x => `[*]${(x.textContent || '').trim()}`).join('\n');
+      return `[list]\n${li}\n[/list]\n`;
+    }
+    if (tag === 'div' || tag === 'p') return `${children(node)}\n`;
+    return children(node);
+  }
+  function children(el) {
+    return Array.from(el.childNodes).map(walk).join('');
+  }
+
+  let out = Array.from(wrap.childNodes).map(walk).join('');
+  out = out.replace(/\n{3,}/g, '\n\n').trim();
+  return out;
+}
+
+function insertHtmlAtCaret(html) {
+  document.execCommand('insertHTML', false, html);
+}
+
+function initCreateEditor() {
+  const form = document.getElementById('createTicketForm');
+  const editor = document.getElementById('ticketMessage');
+  const hidden = document.getElementById('ticketMessageHidden');
+  const bar = form?.querySelector('.bb-toolbar');
+  if (!form || !editor || !hidden || !bar) return;
+
+  // prefill from BBCode
+  if (hidden.value) editor.innerHTML = bbcodeToHtml(hidden.value);
+
+  editor.addEventListener('input', () => {
+    editor.classList.toggle('is-empty', editor.textContent.trim().length === 0);
+  });
+  editor.classList.toggle('is-empty', editor.textContent.trim().length === 0);
+
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('.bb-btn');
+    if (!btn) return;
+    editor.focus();
+    const cmd = btn.dataset.cmd;
+    const action = btn.dataset.action;
+    if (cmd) {
+      document.execCommand(cmd, false, null);
+      return;
+    }
+    if (action === 'link') {
+      const url = prompt('Введите URL');
+      if (!url) return;
+      const sel = window.getSelection();
+      const text = sel && sel.toString() ? sel.toString() : url;
+      insertHtmlAtCaret(`<a href="${url}" target="_blank" rel="noopener">${text}</a>`);
+      return;
+    }
+    if (action === 'quote') {
+      insertHtmlAtCaret('<blockquote class="bb-quote"><br></blockquote>');
+      return;
+    }
+    if (action === 'code') {
+      insertHtmlAtCaret('<pre class="bb-code"></pre><br>');
+      return;
+    }
+    if (action === 'list') {
+      insertHtmlAtCaret('<ul><li></li></ul>');
+    }
+  });
+
+  form.addEventListener('submit', (ev) => {
+    hidden.value = htmlToBbcode(editor.innerHTML);
+
+    // Client-side validation: description is required.
+    // (Browser can't focus hidden required controls, so we validate manually and focus editor.)
+    const text = (hidden.value || '').replace(/\s+/g, ' ').trim();
+    if (!text) {
+      ev.preventDefault();
+      editor.focus();
+      // Small inline hint (non-blocking)
+      editor.classList.add('is-invalid');
+      setTimeout(() => editor.classList.remove('is-invalid'), 1200);
+      alert('Заполните описание заявки.');
+    }
+  });
+}
+
+function initFilePicker() {
+  const input = document.getElementById('ticketFiles');
+  const preview = document.getElementById('ticketFilePreview');
+  if (!input || !preview) return;
+  input.addEventListener('change', () => {
+    const files = Array.from(input.files || []);
+    preview.innerHTML = '';
+    if (!files.length) {
+      preview.style.display = 'none';
+      return;
+    }
+    preview.style.display = '';
+    files.forEach((f) => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.textContent = f.name;
+      preview.appendChild(item);
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initCreateEditor();
+  initFilePicker();
+
+  // Autofill by email (local DB, then Bitrix). Fill only empty fields.
+  const emailEl = document.getElementById('client_email');
+  const nameEl = document.getElementById('client_name');
+  const phoneEl = document.getElementById('client_phone');
+  const orgEl = document.getElementById('organization');
+  const innEl = document.getElementById('inn');
+  const addrEl = document.getElementById('address');
+  const userIdEl = document.getElementById('end_user_id');
+  const statusEl = document.getElementById('clientLookupStatus');
+
+  function setLookupStatus(text, kind){
+    if (!statusEl) return;
+    statusEl.style.display = text ? '' : 'none';
+    statusEl.textContent = text || '';
+    statusEl.classList.remove('text-success','text-danger','text-muted');
+    if (kind === 'success') statusEl.classList.add('text-success');
+    else if (kind === 'danger') statusEl.classList.add('text-danger');
+    else statusEl.classList.add('text-muted');
+  }
+
+  async function tryFillFromLocal(email){
+    try{
+      const r = await fetch(`/api/user-by-email?email=${encodeURIComponent(email)}`);
+      if (!r.ok) return false;
+      const data = await r.json();
+      if (!data || !data.success) return false;
+      if (userIdEl) userIdEl.value = data.user_id || '';
+      if (nameEl && !nameEl.value) nameEl.value = data.full_name || '';
+      if (phoneEl && !phoneEl.value) phoneEl.value = data.phone || '';
+      if (orgEl && !orgEl.value) orgEl.value = data.organization || '';
+      if (innEl && !innEl.value) innEl.value = data.inn || '';
+      if (addrEl && !addrEl.value) addrEl.value = data.address || '';
+      setLookupStatus('Клиент найден в новой системе', 'success');
+      return true;
+    } catch(e){ return false; }
+  }
+
+  async function tryFillFromBitrix(email){
+    try{
+      const r = await fetch(`/api/bitrix/company-by-email?email=${encodeURIComponent(email)}`);
+      if (!r.ok) return false;
+      const data = await r.json();
+      if (!data || !data.success) return false;
+      if (orgEl && !orgEl.value) orgEl.value = data.company_name || '';
+      if (innEl && !innEl.value) innEl.value = data.inn || '';
+      if (addrEl && !addrEl.value) addrEl.value = data.address || '';
+      // не перетираем статус, если уже нашли в новой системе
+      if (!(userIdEl && userIdEl.value)) setLookupStatus('В новой системе не найден — данные компании подтянуты из Битрикс', 'muted');
+      return true;
+    } catch(e){ return false; }
+  }
+
+  // Only for operators (client email is readonly)
+  if (emailEl && !emailEl.hasAttribute('readonly')) {
+    emailEl.addEventListener('blur', async () => {
+      const email = (emailEl.value || '').trim().toLowerCase();
+      if (!email) return;
+      if (userIdEl) userIdEl.value = '';
+      setLookupStatus('Проверяем…', 'muted');
+
+      const foundLocal = await tryFillFromLocal(email);
+
+      // если в новой системе не нашли — пробуем Битрикс
+      if (!foundLocal) {
+        const foundBitrix = await tryFillFromBitrix(email);
+        if (!foundBitrix) setLookupStatus('Клиент не найден ни в новой системе, ни в Битрикс', 'danger');
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

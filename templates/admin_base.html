@@ -1,0 +1,169 @@
+<!-- templates/admin_base.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Админ-панель{% endblock %}</title>
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='blue-theme/admin/styles.css') }}">{% endblock %}
+</head>
+<body>
+
+<div class="admin-sidebar">
+    <!-- Логотип и заголовок -->
+    <div class="admin-sidebar-header">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Логотип" class="admin-sidebar-logo">
+        <h2>Техподдержка</h2>
+    </div>
+
+     <!-- Новый пункт "Техническая поддержка" -->
+    <a href="{{ url_for('admin_support_list') }}" {% if request.endpoint == 'admin_support_list' %}class="active"{% endif %}>
+        🛠️ Список задач
+    </a>
+    <a href="{{ url_for('admin') }}" {% if request.endpoint == 'admin' %}class="active"{% endif %}>
+        🗂️ Доска задач
+    </a>
+    <a href="{{ url_for('admin_stats') }}" {% if request.endpoint == 'admin_stats' %}class="active"{% endif %}>
+        📊 Статистика
+    </a>
+    <a href="{{ url_for('admin_charts') }}" {% if request.endpoint == 'admin_charts' %}class="active"{% endif %}>
+        📈 Графики
+    </a>
+    <a href="{{ url_for('admin_reports') }}" {% if request.endpoint == 'admin_reports' %}class="active"{% endif %}>
+        📑 Отчёты
+    </a>
+    <a href="{{ url_for('admin_settings') }}" {% if request.endpoint == 'admin_settings' %}class="active"{% endif %}>
+        ⚙️ Настройки
+    </a>
+    <a href="{{ url_for('logout') }}" style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #34495e;">
+        🔙 Выйти
+    </a>
+    <!-- копирайт в нижнем левом углу -->
+    <div class="admin-sidebar-footer">
+        <div style="font-size: 0.8em; color: #bdc3c7;">© 2025 АО Центр ИКТ РБ <BR>версия 0.3.8</div>
+    </div>
+</div>
+
+<div class="admin-content">
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <div class="flash">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <div class="page-header">
+        <h1>{% block page_title %}{% endblock %}</h1>
+    </div>
+
+    {% block content %}{% endblock %}
+</div>
+<!-- Toast-уведомления -->
+<div id="toastContainer" style="
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+">
+</div>
+<script>
+    // === УВЕДОМЛЕНИЯ О НОВЫХ ЗАЯВКАХ ===
+    let lastKnownTicketId = 0;
+    
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            padding: 12px 20px;
+            color: white;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 350px;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease-out;
+        `;
+        // Цвета
+        if (type === 'new') {
+            toast.style.background = '#28a745'; // Зелёный
+        } else if (type === 'error') {
+            toast.style.background = '#dc3545'; // Красный
+        } else {
+            toast.style.background = '#17a2b8'; // Синий
+        }
+        toast.innerHTML = `
+            <strong>🔔 Новое обращение!</strong><br>
+            ${message}
+        `;
+        document.getElementById('toastContainer').appendChild(toast);
+    
+        // Авто-скрытие через 6 сек
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 500);
+        }, 6000);
+    }
+    
+    function checkForNewTickets() {
+        fetch('/api/tickets')
+            .then(response => response.json())
+            .then(tickets => {
+                if (!Array.isArray(tickets)) return;
+                if (tickets.length === 0) return;
+    
+                const newestTicket = tickets[0]; // Сортировка по убыванию в API
+                if (newestTicket.id > lastKnownTicketId) {
+                    lastKnownTicketId = newestTicket.id;
+                    // Показываем уведомление только если заявка новая ИЛИ "ВНИМАНИЕ!"
+                    if (newestTicket.status === "Новая" || 
+                        newestTicket.department === "ВНИМАНИЕ! Требуется обработка") {
+                        showToast(
+                            `#${newestTicket.id}: ${newestTicket.subject}<br>
+                             От: ${newestTicket.name} (${newestTicket.email})<br>
+                             Отдел: ${newestTicket.department}`,
+                            'new'
+                        );
+                    }
+                }
+            })
+            .catch(err => {
+                console.warn('Не удалось проверить новые заявки:', err);
+            });
+    }
+    
+    // Запуск при загрузке и каждые 15 секунд
+    document.addEventListener('DOMContentLoaded', () => {
+        // Получаем ID самой новой заявки при старте
+        fetch('/api/tickets')
+            .then(r => r.json())
+            .then(tickets => {
+                if (tickets.length > 0) {
+                    lastKnownTicketId = tickets[0].id;
+                }
+            })
+            .catch(() => {});
+        
+        // Периодическая проверка
+        setInterval(checkForNewTickets, 15000); // каждые 15 сек
+    });
+    </script>
+    
+    <style>
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    </style>
+</body>
+</html>

@@ -1,0 +1,58 @@
+
+/* analytics.css — страницы Статистика/Отчёты в стиле проекта */
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px;}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);padding:14px;display:flex;flex-direction:column;gap:8px;}
+.metric-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.metric-label{font-size:.82rem;color:var(--muted);font-weight:700;}
+.metric-value{font-size:1.65rem;font-weight:850;letter-spacing:-.02em;line-height:1.1;}
+.metric-sub{font-size:.84rem;color:var(--muted);line-height:1.35;}
+.metric-ico{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(37,99,235,.10);border:1px solid rgba(37,99,235,.18);color:var(--primary);flex:0 0 auto;}
+.metric-ico.success{background:rgba(22,163,74,.10);border-color:rgba(22,163,74,.18);color:var(--success);}
+.metric-ico.danger{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.18);color:var(--danger);}
+.metric-ico.info{background:rgba(14,165,233,.10);border-color:rgba(14,165,233,.18);color:var(--info);}
+
+.analytics-grid{display:grid;grid-template-columns:1.45fr 1fr;gap:16px;margin-top:16px;}
+@media (max-width:1100px){.analytics-grid{grid-template-columns:1fr;}}
+
+.filters-grid{display:grid;grid-template-columns:240px 240px 240px 170px 170px 1fr;gap:12px;align-items:end;}
+@media (max-width:1200px){.filters-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width:520px){.filters-grid{grid-template-columns:1fr;}}
+
+.canvas-wrap{width:100%;height:320px;}
+.canvas-wrap.sm{height:240px;}
+.canvas-wrap canvas{width:100% !important;height:100% !important;}
+
+
+/* spacing helpers */
+.section-gap{ margin-top:16px; }
+.section-gap-lg{ margin-top:24px; }
+
+/* reports: compact table */
+.report-table .table th,
+.report-table .table td{
+  padding:8px 10px;
+  font-size:.92rem;
+}
+.report-table .table thead th{
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.report-table .table-responsive{
+  max-height: 420px;
+  overflow:auto;
+}
+
+
+/* spacing between blocks */
+.kpi-grid{margin-bottom:16px;}
+
+/* compact table for reports */
+.table-compact thead th{padding:.5rem .7rem;}
+.table-compact tbody td{padding:.45rem .7rem;font-size:.9rem;}
+.reports-table-wrap{max-height:560px;overflow:auto;}
+.reports-table{table-layout:fixed;}
+.reports-table td, .reports-table th{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.reports-table td:nth-child(2){white-space:normal;}

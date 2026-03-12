@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Пользователь #{{ u.id }}{% endblock %}
+
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<div class="page-container">
+  <div class="page-toolbar" style="margin-bottom:16px;">
+    <div class="page-title"><span>Пользователь #{{ u.id }}</span></div>
+  </div>
+  <div style="display:flex; gap:18px; flex-wrap:wrap;">
+    <div style="flex:1 1 520px; background:#fff; border:1px solid #eee; border-radius:10px; padding:16px;">
+      <form method="POST">
+        <h3 style="margin-top:0;">Профиль</h3>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div>
+            <label>Фамилия</label><br>
+            <input name="last_name" value="{{ u.last_name or '' }}" style="width:100%; padding:7px 10px;">
+          </div>
+          <div>
+            <label>Имя</label><br>
+            <input name="name" value="{{ u.name or '' }}" style="width:100%; padding:7px 10px;">
+          </div>
+          <div>
+            <label>Отчество</label><br>
+            <input name="patronymic" value="{{ u.patronymic or '' }}" style="width:100%; padding:7px 10px;">
+          </div>
+          <div>
+            <label>Телефон</label><br>
+            <input name="phone" value="{{ u.phone or '' }}" style="width:100%; padding:7px 10px;">
+          </div>
+
+          <div>
+            <label>Организация</label><br>
+            <input name="organization" value="{{ u.organization or '' }}" style="width:100%; padding:7px 10px;">
+          </div>
+          <div>
+            <label>Должность</label><br>
+            <input name="position" value="{{ u.position or '' }}" style="width:100%; padding:7px 10px;">
+          </div>
+          <div>
+            <label>ИНН</label><br>
+            <input name="inn" value="{{ u.inn or '' }}" style="width:100%; padding:7px 10px;">
+          </div>
+          <div>
+            <label>Адрес</label><br>
+            <input name="address" value="{{ u.address or '' }}" style="width:100%; padding:7px 10px;">
+          </div>
+        </div>
+
+        <hr style="margin:16px 0;">
+
+        <h3 style="margin:0 0 8px 0;">Доступ</h3>
+
+        {% if current_user.role == 'admin' %}
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <div>
+              <label>Логин</label><br>
+              <input name="username" value="{{ u.username }}" style="width:100%; padding:7px 10px;">
+            </div>
+            <div>
+              <label>Email</label><br>
+              <input name="email" value="{{ u.email or '' }}" style="width:100%; padding:7px 10px;">
+            </div>
+            <div>
+              <label>Роль</label><br>
+              <select name="role" style="width:100%; padding:7px 10px;">
+                <option value="user" {% if u.role=='user' %}selected{% endif %}>user</option>
+                <option value="operator" {% if u.role=='operator' %}selected{% endif %}>operator</option>
+                <option value="admin" {% if u.role=='admin' %}selected{% endif %}>admin</option>
+              </select>
+            </div>
+            <div>
+              <label>Основной отдел</label><br>
+              <select name="department_id" style="width:100%; padding:7px 10px;">
+                <option value="" {% if not u.department_id %}selected{% endif %}>—</option>
+                {% for d in departments %}
+                  <option value="{{ d.id }}" {% if u.department_id==d.id %}selected{% endif %}>{{ d.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        {% else %}
+          <div style="color:#666;">Изменение логина/email/роли/отдела доступно только администратору.</div>
+        {% endif %}
+
+        <div style="display:flex; gap:16px; margin-top:12px;">
+          <label><input type="checkbox" name="email_verified" {% if u.email_verified %}checked{% endif %}> Email подтверждён</label>
+          <label><input type="checkbox" name="is_active" {% if u.is_active %}checked{% endif %}> Активен</label>
+        </div>
+
+        <div style="margin-top:16px; display:flex; gap:10px;">
+          <button type="submit" style="padding:8px 14px;">Сохранить</button>
+          <a href="{{ url_for('admin_users') }}">Назад</a>
+        </div>
+      </form>
+    </div>
+
+    <div style="flex:0 0 320px; background:#fff; border:1px solid #eee; border-radius:10px; padding:16px;">
+      <h3 style="margin-top:0;">Действия</h3>
+
+      <form method="POST" action="{{ url_for('admin_user_reset_password', user_id=u.id) }}">
+        <button type="submit" style="padding:8px 14px; width:100%;">Сбросить пароль (временный)</button>
+      </form>
+
+      <div style="margin-top:12px; color:#666; font-size: 0.95em;">
+        После сброса пароля пользователю будет выдан временный пароль и установлена обязательная смена.
+      </div>
+
+      <hr style="margin:16px 0;">
+      <div style="color:#666; font-size: 0.95em;">
+        <div><b>Создан:</b> {{ u.created_at }}</div>
+        <div><b>Последний вход:</b> {{ u.last_login_at or '—' }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+  </section>
+</div>
+{% endblock %}

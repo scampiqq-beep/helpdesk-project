@@ -1,0 +1,63 @@
+{% extends "auth_base.html" %}
+{% from 'partials/svg.html' import svg %}
+
+{% block title %}Вход{% endblock %}
+
+{% block content %}
+  <div class="auth-wrap">
+    <div class="card auth-card">
+      <div class="card-header auth-head">
+        <div class="d-flex align-items-center gap-2">
+          {{ svg('user') }}
+          <div class="auth-title">Вход</div>
+        </div>
+        <div class="auth-subtitle">Система обращений техподдержки</div>
+      </div>
+
+      <div class="card-body">
+        <div class="text-muted mb-3">
+          Введите <strong>email</strong> (для клиентов) или <strong>логин</strong> (для сотрудников) и пароль.
+        </div>
+
+        <form method="POST" class="auth-form">
+          <div class="field">
+            <label for="username">Email или логин</label>
+            <input id="username" name="username" class="input" placeholder="email или логин" autocomplete="username" required>
+          </div>
+
+          <div class="field">
+            <label for="password">Пароль</label>
+            <div class="input-wrap">
+              <input type="password" id="password" name="password" class="input" placeholder="пароль" autocomplete="current-password" required>
+              <button type="button" class="icon-btn js-toggle-pass" aria-label="Показать пароль" title="Показать пароль">
+                {{ svg('eye','ico') }}
+              </button>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 mt-3">
+            <button type="submit" class="btn btn-action-primary btn-sm">Войти</button>
+            <a href="{{ url_for('register') }}" class="btn btn-action btn-sm">Регистрация</a>
+          </div>
+        </form>
+
+        <div class="auth-foot text-muted mt-3">
+          Если вы клиент и впервые в системе — создайте учётную запись.
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const btn = document.querySelector('.js-toggle-pass');
+  const inp = document.getElementById('password');
+  if(!btn || !inp) return;
+  btn.addEventListener('click', function(){
+    inp.type = (inp.type === 'password') ? 'text' : 'password';
+  });
+});
+</script>
+{% endblock %}

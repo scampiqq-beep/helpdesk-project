@@ -1,0 +1,1566 @@
+{% extends "base.html" %}
+{% from 'partials/svg.html' import svg %}
+
+{# статусы, при которых тикет считается закрытым/неактивным для управления #}
+{# Вариант A: в списках/фильтрах оставляем 4 состояния, подстатусы закрытия храним в ticket.close_reason #}
+{% set CLOSED_STATUSES = ['Завершена'] %}
+{% set is_important = (ticket.priority or '') in ['critical','Критический'] %}
+
+
+{% block content %}
+  <div class="container-fluid ticket-view">
+  {% if current_user.is_authenticated and current_user.is_operator() %}
+  <div class="page-toolbar" style="margin-bottom:12px;">
+    <div class="page-actions">
+      <a class="btn btn-action" href="{{ url_for('admin_automation_preview', ticket_id=ticket.id) }}">Проверка автоматизации</a>
+      {% if ticket.inn %}<a class="btn btn-action" href="{{ url_for('admin_organization_card', inn=ticket.inn) }}">Карточка организации</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="ticket-layout">
+    <!-- LEFT -->
+    <div class="ticket-main">
+      <div class="card mb-3">
+        {# Хедер заявки — в стиле остальных блоков (как «Комментарии») #}
+        <div class="card-header d-flex justify-content-between align-items-center ticket-detail-head">
+          <div class="d-flex align-items-center gap-2" style="min-width:0;">
+            <span class="fw-semibold ticket-title" title="{{ ticket.subject or 'Без темы' }}">{{ ticket.subject or 'Без темы' }}</span>
+                        <button type="button" class="icon-btn copy-link-btn" onclick="copyTicketLink()" title="Копировать ссылку" aria-label="Копировать ссылку">
+              {{ svg('copy','ico') }}
+            </button>
+          </div>
+
+          <div class="ticket-header-actions">
+            {% if is_operator or is_admin %}
+              <button type="button"
+                      class="btn btn-action-primary btn-sm important-toggle-btn {% if (ticket.priority or '') in ['critical','Критический'] %}is-active{% endif %}"
+                      onclick="toggleImportantTask()"
+                      title="Сделать важной задачей"
+                      aria-label="Сделать важной задачей">
+                <span class="important-toggle-text">
+                  {% if (ticket.priority or '') in ['critical','Критический'] %}Важная задача{% else %}Сделать важной задачей{% endif %}
+                </span>
+                <span class="important-toggle-icon" aria-hidden="true">🔥</span>
+              </button>
+            {% endif %}
+          </div>
+        </div>
+        <div class="card-body">
+          {% if show_org_mismatch and mismatch_info %}
+            <div class="alert alert-warning d-flex justify-content-between align-items-start gap-3" role="alert">
+              <div>
+                <div class="fw-semibold">Вы создаёте заявку не для своей организации</div>
+                <div class="small mt-1">
+                  В профиле: <span class="fw-semibold">{{ mismatch_info.profile_org or '—' }}</span> (ИНН {{ mismatch_info.profile_inn or '—' }})<br>
+                  В заявке: <span class="fw-semibold">{{ mismatch_info.ticket_org or '—' }}</span> (ИНН {{ mismatch_info.ticket_inn or '—' }})
+                </div>
+                <div class="small mt-2">Если это ваша организация — перенесите реквизиты из заявки в профиль.</div>
+              </div>
+              <form method="post" class="m-0">
+                <input type="hidden" name="action" value="copy_org_to_profile">
+                <button type="submit" class="btn btn-sm btn-outline-dark">Перенести в профиль</button>
+              </form>
+            </div>
+          {% endif %}
+
+          <div class="message-content ticket-content" id="ticket-message">{{ ticket.message|bbcode|safe }}</div>
+
+          {% if ticket.files %}
+            <div class="ticket-attachments mt-4">
+              {% set files_list = ticket.files|from_json %}
+              {% if files_list %}
+                {% set images = [] %}
+                {% set documents = [] %}
+                {% for filename in files_list %}
+                  {% set ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else '' %}
+                  {% if ext in ['png', 'jpg', 'jpeg', 'gif'] %}{% set _ = images.append(filename) %}{% else %}{% set _ = documents.append(filename) %}{% endif %}
+                {% endfor %}
+
+                {% if images %}
+                  <div class="attachments-section">
+                    <div class="section-title">Изображения</div>
+                    <div class="image-thumbnails">
+                      {% for filename in images %}
+                        <a href="#" onclick="openImageModal('{{ url_for('static', filename='uploads/attachments/' + filename) }}', '{{ filename }}'); return false;">
+                          <img src="{{ url_for('static', filename='uploads/attachments/' + filename) }}" alt="{{ filename }}" title="{{ filename }}">
+                        </a>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+
+                {% if documents %}
+                  <div class="attachments-section mt-3">
+                    <div class="section-title">Документы</div>
+                    <ul class="documents-list">
+                      {% for filename in documents %}
+                        <li><a href="{{ url_for('static', filename='uploads/attachments/' + filename) }}" target="_blank" download>{{ filename }}</a></li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if is_client and ticket.status == 'Ожидание' %}
+            <div class="card notice-warning mt-3">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center gap-3" style="flex-wrap:wrap;">
+                  <div>
+                    <div class="notice-title">Ожидает вашего подтверждения</div>
+                    <div class="text-muted small">Проверьте результат оператора и подтвердите выполнение.</div>
+                  </div>
+                  <div class="text-end">
+                    <div class="small text-muted">Автозакрытие через</div>
+                    <div id="countdown-timer" class="countdown">Загрузка…</div>
+                  </div>
+                </div>
+                <div class="d-flex gap-2 mt-3" style="flex-wrap:wrap;">
+                  <form method="POST" action="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">
+                    <input type="hidden" name="action" value="accept_work">
+                    <button type="submit" class="btn btn-action-primary" onclick="return confirm('Вы подтверждаете, что работа выполнена полностью и заявку можно закрыть?')">{{ svg('check') }}Принять работу</button>
+                  </form>
+                  <button type="button" class="btn btn-action" onclick="requestRework()">На доработку</button>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+          {% if is_operator or is_admin %}
+            <div class="ticket-actions-inline mt-4">
+              <div class="d-flex gap-2" style="flex-wrap:wrap;">
+                {% set is_final_status = (ticket.status == 'Завершена') %}
+
+                {% if is_final_status %}
+                  <form method="POST" action="{{ url_for('ticket_detail', ticket_id=ticket.id) }}" style="display:inline;">
+                    <input type="hidden" name="action" value="reopen_ticket_operator">
+                    <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Возобновить заявку и вернуть в работу?')">Возобновить</button>
+                  </form>
+                {% endif %}
+                {% if ticket.status not in ['Завершена','Ожидание'] %}
+                  <button type="button" class="btn btn-action btn-sm" onclick="openDelegateModal()">Делегировать</button>
+                {% endif %}
+                {% if ticket.status != 'Завершена' %}
+                  <!-- Единая кнопка "Завершить" -> модальное окно -->
+                  <button type="button" class="btn btn-action-primary btn-sm" data-bs-toggle="modal" data-bs-target="#finishModal">
+                    Завершить
+                  </button>
+                {% endif %}
+
+                {% if ticket.bitrix_task_id %}
+                  <a class="btn btn-action btn-sm" id="bitrix-task-link" href="https://corportal.ciktrb.ru/workgroups/group/82/tasks/task/view/{{ ticket.bitrix_task_id }}/" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right"></i> Задача Битрикс №{{ ticket.bitrix_task_id }}
+                  </a>
+                {% else %}
+                  {% if not is_final_status %}
+                    <button type="button" class="btn btn-action-primary btn-sm" id="create-bitrix-task-btn">
+                      <i class="bi bi-kanban"></i> Создать задачу в Битрикс
+                    </button>
+                  {% endif %}
+                {% endif %}
+              </div>
+
+
+            <!-- Модалка завершения (единая точка управления) -->
+            <div class="modal fade" id="finishModal" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content hd-modal">
+                  <form method="POST" action="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">
+                    <input type="hidden" name="action" value="finish_modal">
+                    <div class="modal-header">
+                      <h5 class="modal-title">Завершение заявки</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="text-muted small mb-2">
+                        Выберите сценарий. Для <strong>Ожидания</strong> требуется закреплённый результат.
+                      </div>
+
+                      <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="finish_choice" id="finish_waiting" value="waiting" checked>
+                        <label class="form-check-label" for="finish_waiting">Перевести в <strong>Ожидание</strong> (на подтверждение клиента)</label>
+                      </div>
+
+                      <hr class="my-3">
+                      <div class="fw-semibold mb-2">Закрыть сразу как "Завершена" (причина):</div>
+                      {% for r in close_reasons %}
+                        <div class="form-check mb-2">
+                          <input class="form-check-input" type="radio" name="finish_choice" id="finish_{{ r.code }}" value="{{ r.code }}">
+                          <label class="form-check-label" for="finish_{{ r.code }}">{{ r.name }}</label>
+                        </div>
+                      {% endfor %}
+
+                      <div class="mt-3">
+                        <label class="form-label">Комментарий (опционально)</label>
+                        <textarea class="form-control" name="finish_comment" rows="3" placeholder="Например: закрыто как дубликат, т.к. есть заявка #123"></textarea>
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Отмена</button>
+                      <button type="submit" class="btn btn-action-primary">Применить</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+      <!-- Pinned result -->
+      {% if pinned_result %}
+        <div class="card mb-3 pinned">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              {{ svg('pin') }}<span class="fw-semibold">Закрепленный комментарий</span>
+            </div>
+            {% if is_operator or is_admin %}
+              {# Размер как у кнопки "Редактировать" в комментариях (btn-action btn-sm) #}
+              <button type="button" class="btn btn-action btn-sm unpin-btn">{{ svg('x','ico') }}Открепить</button>
+            {% endif %}
+          </div>
+          <div class="card-body message-content">{{ pinned_result.message|bbcode|safe }}</div>
+        </div>
+      {% endif %}
+
+      <!-- Comments -->
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-2">{{ svg('inbox') }}<span>Комментарии</span></div>
+          {% if ticket.status == 'Завершена' %}
+            {% if ticket.close_reason == 'spam' %}
+              <span class="badge pill">Завершена (Спам)</span>
+            {% elif ticket.close_reason == 'duplicate' %}
+              <span class="badge pill">Завершена (Дубликат)</span>
+            {% elif ticket.close_reason == 'wrong' %}
+              <span class="badge pill">Завершена (Ошибочная)</span>
+            {% elif ticket.close_reason == 'withdrawn' %}
+              <span class="badge pill">Завершена (Отозванная)</span>
+            {% else %}
+              <span class="badge pill">Завершена</span>
+            {% endif %}
+          {% endif %}
+        </div>
+        <div class="card-body">
+          {% if ticket.status not in CLOSED_STATUSES %}
+            <div class="comment-compose mb-3">
+              <form method="POST" enctype="multipart/form-data" id="commentForm" action="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">
+                {{ comment_form.hidden_tag() }}
+                <label for="commentMessageHidden" class="form-label">Сообщение</label>
+                <div class="bb-toolbar" role="toolbar">
+                  <button type="button" class="bb-btn" data-cmd="bold"><b>B</b></button>
+                  <button type="button" class="bb-btn" data-cmd="italic"><i>I</i></button>
+                  <button type="button" class="bb-btn" data-cmd="strikeThrough"><s>S</s></button>
+                  <button type="button" class="bb-btn" data-action="link">URL</button>
+                  <button type="button" class="bb-btn" data-action="list">List</button>
+                  <button type="button" class="bb-btn" data-action="quote">Quote</button>
+                  <button type="button" class="bb-btn" data-action="code">Code</button>
+                  {% if is_operator or is_admin %}
+                    <button type="button" class="bb-btn" data-action="kb">Шаблон</button>
+                  {% endif %}
+                </div>
+                <div id="commentMessage" class="bb-editor" contenteditable="true" data-placeholder="Напишите комментарий…"></div>
+                <textarea name="message" id="commentMessageHidden" class="bb-hidden" style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; opacity:0;"></textarea>
+
+                {# Индикатор «оператор пишет…» отображаем в блоке "В заявке сейчас" (только оператор/админ) #}
+
+                <div class="mt-2">
+                  <label class="form-label">Файлы</label>
+                  <label class="file-picker"><span class="btn btn-secondary btn-sm">Выбрать файлы</span><input type="file" id="commentFiles" name="files" multiple accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx,.xls,.xlsx,.txt"></label>
+                  <div id="commentFilePreview" class="file-preview" style="display:none;"></div>
+                </div>
+
+                <div class="mt-3 d-flex gap-2" style="flex-wrap:wrap;">
+                  {# Размер/стиль как у кнопки "Создать заявку" (единый CTA по сайту) #}
+                  <button type="submit" class="btn btn-action-primary btn-sm">{{ svg('edit') }}Отправить</button>
+                </div>
+              </form>
+            </div>
+          {% else %}
+            <div class="notice muted mb-3">Комментирование закрыто — заявка завершена.</div>
+          {% endif %}
+
+          <div id="comments-list" class="comment-list">
+            {% if messages %}
+              {% for msg in messages %}
+                <div class="comment-item {% if msg.is_operator %}is-operator{% else %}is-client{% endif %}" id="comment-{{ msg.id }}">
+                  <div class="comment-top">
+                    <div class="comment-who">
+                      <div>
+                        <div class="comment-name">
+                          {% if msg.is_operator %}
+                            {{ svg('operator', 'ico ico-op') }}
+                          {% else %}
+                            {{ svg('user', 'ico ico-client') }}
+                          {% endif %}
+                          <span class="comment-user">{{ msg.username }}</span>
+                          {% if pinned_result and msg.id == pinned_result.id %}
+                            <span class="badge pinned">{{ svg('pin') }}Закреплено</span>
+                          {% endif %}
+                        </div>
+                        <div class="comment-meta">
+                          {% if 'Клиент запросил доработку:' in msg.message %}
+                            <span class="badge danger">Требуется доработка</span>
+                          {% endif %}
+                          {# Закреплено показываем рядом с ФИО #}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="comment-time">
+                      {{ msg.created_at[:16].replace('T',' ') }}
+                      {% if msg.edited_at %}
+                        <span class="comment-edited"> · отредактировано{% if msg.edited_by_name %} {{ msg.edited_by_name }}{% endif %} {{ msg.edited_at[:16].replace('T',' ') }}</span>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="message-content comment-body" data-raw="{{ (msg.raw_message or '')|e }}">{{ (msg.raw_message or msg.message)|bbcode|safe }}</div>
+
+                  <form class="comment-edit-form" id="edit-form-{{ msg.id }}" method="POST" action="{{ url_for('edit_ticket_comment', ticket_id=ticket.id, message_id=msg.id) }}" style="display:none;">
+                    <div class="bb-toolbar" role="toolbar">
+                      <button type="button" class="bb-btn" data-cmd="bold"><b>B</b></button>
+                      <button type="button" class="bb-btn" data-cmd="italic"><i>I</i></button>
+                      <button type="button" class="bb-btn" data-cmd="strikeThrough"><s>S</s></button>
+                      <button type="button" class="bb-btn" data-action="link">URL</button>
+                      <button type="button" class="bb-btn" data-action="list">List</button>
+                      <button type="button" class="bb-btn" data-action="quote">Quote</button>
+                      <button type="button" class="bb-btn" data-action="code">Code</button>
+                      {% if is_operator or is_admin %}
+                        <button type="button" class="bb-btn" data-action="kb">Шаблон</button>
+                      {% endif %}
+                    </div>
+                    <div class="bb-editor" contenteditable="true"></div>
+                    <textarea name="message" class="bb-hidden" style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; opacity:0;"></textarea>
+                    {% if msg.attachments %}
+                      <div class="edit-attachments">
+                        <div class="edit-attachments-title">Вложения</div>
+                        <div class="edit-attachments-list">
+                          {% for att in msg.attachments %}
+                            <label class="edit-attachment-item">
+                              <input type="checkbox" name="delete_attachment_ids" value="{{ att.id }}">
+                              <span class="edit-attachment-name">Удалить: {{ att.original_name }}</span>
+                            </label>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    {% endif %}
+
+                    <div class="comment-edit-actions d-flex gap-2" style="flex-wrap:wrap;">
+                      <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
+                      <button type="button" class="btn btn-secondary btn-sm cancel-edit-btn" data-comment-id="{{ msg.id }}">Отмена</button>
+                    </div>
+                  </form>
+
+                  {% if msg.attachments %}
+                    <div class="comment-attachments">
+                      {% set images = [] %}
+                      {% set documents = [] %}
+                      {% for att in msg.attachments %}
+                        {% set ext = att.original_name.rsplit('.', 1)[1].lower() if '.' in att.original_name else '' %}
+                        {% if ext in ['png','jpg','jpeg','gif'] %}{% set _ = images.append(att) %}{% else %}{% set _ = documents.append(att) %}{% endif %}
+                      {% endfor %}
+
+                      {% if images %}
+                        <div class="comment-images">
+                          {% for att in images %}
+                            <img src="{{ att.url }}" alt="{{ att.original_name }}" title="{{ att.original_name }}" onclick="openImageModal('{{ att.url }}','{{ att.original_name }}')">
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+
+                      {% if documents %}
+                        <div class="documents-inline">
+                          {% for att in documents %}
+                            <a class="doc-link" href="{{ att.url }}" target="_blank">{{ att.original_name }}</a>
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+
+                  <div class="comment-actions">
+                    {% if ticket.status not in CLOSED_STATUSES %}
+                      <button type="button" class="btn btn-action btn-sm reply-btn" data-comment-id="{{ msg.id }}" data-username="{% if msg.is_operator %}{{ msg.username }}{% else %}{{ ticket.name or 'Клиент' }}{% endif %}">Ответить</button>
+                      {% if ticket.status not in CLOSED_STATUSES and (is_admin or msg.user_id == current_user.id) %}
+                        <button type="button" class="btn btn-action btn-sm edit-comment-btn" data-comment-id="{{ msg.id }}">Редактировать</button>
+                      {% endif %}
+                      {% if is_admin %}
+                        <form method="POST" action="{{ url_for('delete_ticket_comment', ticket_id=ticket.id, message_id=msg.id) }}" style="display:inline;" onsubmit="return confirm('Удалить комментарий?');">
+                          <button type="submit" class="btn btn-ghost-danger btn-sm">Удалить</button>
+                        </form>
+                      {% endif %}
+                    {% endif %}
+                    {% if is_operator and msg.is_operator and ticket.status not in CLOSED_STATUSES %}
+                      <button type="button" class="btn btn-action-primary btn-sm pin-result-btn" data-comment-id="{{ msg.id }}" {% if ticket.status == 'Завершена' %}disabled{% endif %}>Закрепить результат</button>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-muted small">Комментариев пока нет</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="ticket-side">
+      <div class="card mb-3">
+        <div class="card-header">Информация</div>
+        <div class="card-body">
+          <div class="sidebar-kv">
+            <div class="kv-small">
+              <span>ID заявки</span>
+              {# Копирование по клику на текст (без иконок) #}
+              <a href="#" class="kv-copytext copy-as-link" data-copy="{{ ticket.id|ticket_id }}" title="Нажмите, чтобы скопировать">#{{ ticket.id|ticket_id }}</a>
+            </div>
+            <div>
+              <span>Статус</span>
+              <strong>
+                {% set status_text = ticket.status or '—' %}
+                {% if ticket.status in CLOSED_STATUSES %}
+                  {% if ticket.is_spam or ticket.close_reason == 'spam' %}
+                    {% set status_text = 'Завершена (Спам)' %}
+                  {% elif ticket.close_reason == 'duplicate' %}
+                    {% set status_text = 'Завершена (Дубликат)' %}
+                  {% elif ticket.close_reason == 'wrong' %}
+                    {% set status_text = 'Завершена (Ошибочная)' %}
+                  {% elif ticket.close_reason == 'withdrawn' %}
+                    {% set status_text = 'Завершена (Отозванная)' %}
+                  {% endif %}
+                {% endif %}
+                <span class="status-badge {{ status_badge_class(ticket.status) }}">{{ status_text }}</span>
+              </strong>
+            </div>
+
+            <div class="kv-small"><span>Создано</span><strong>{{ ticket.created_at|localtime if ticket.created_at else '—' }}</strong></div>
+            {% if sla_view %}
+            <div class="kv-small kv-deadline">
+              <span>Крайний срок ответа</span>
+              <div class="deadline-box deadline-box--bitrix">
+                <div class="sla-bitrix js-sla-live"
+                     data-deadline-iso="{{ sla_view.first_deadline.isoformat() ~ 'Z' if sla_view.first_deadline else '' }}"
+                     data-target-minutes="{{ sla_view.first_response.target_minutes or '' }}"
+                     data-state="{{ sla_view.first_response.chip_status }}"
+                     data-live="{{ 1 if (sla_view.first_response.deadline and not sla_view.first_response.completed and not sla_view.first_response.paused) else 0 }}"
+                     data-paused="{{ 1 if sla_view.first_response.paused else 0 }}">
+                  <span class="sla-chip sla-{{ sla_view.first_response.chip_status }} sla-bitrix__chip" title="{{ sla_view.first_response.title }}">{{ sla_view.first_response.compact_label }}</span>
+                </div>
+                <div class="deadline-meta">до {{ sla_view.first_response.deadline_text }}</div>
+              </div>
+            </div>
+            <div class="kv-small kv-deadline">
+              <span>Крайний срок решения</span>
+              <div class="deadline-box deadline-box--bitrix">
+                <div class="sla-bitrix js-sla-live"
+                     data-deadline-iso="{{ sla_view.resolve_deadline.isoformat() ~ 'Z' if sla_view.resolve_deadline else '' }}"
+                     data-target-minutes="{{ sla_view.resolve.target_minutes or '' }}"
+                     data-state="{{ sla_view.resolve.chip_status }}"
+                     data-live="{{ 1 if (sla_view.resolve.deadline and not sla_view.resolve.completed and not sla_view.resolve.paused) else 0 }}"
+                     data-paused="{{ 1 if sla_view.resolve.paused else 0 }}">
+                  <span class="sla-chip sla-{{ sla_view.resolve.chip_status }} sla-bitrix__chip" title="{{ sla_view.resolve.title }}">{{ sla_view.resolve.compact_label }}</span>
+                </div>
+                <div class="deadline-meta">до {{ sla_view.resolve.deadline_text }}</div>
+              </div>
+            </div>
+            {% endif %}
+            <div>
+              <span>ФИО</span>
+              {% if ticket.name %}
+                <a href="#" class="kv-copytext copy-as-link" data-copy="{{ ticket.name }}" title="Нажмите, чтобы скопировать">{{ ticket.name }}</a>
+              {% else %}
+                <strong class="text-muted">—</strong>
+              {% endif %}
+            </div>
+            <div>
+              <span>Email</span>
+              {% if ticket.email %}
+                <a href="#" class="kv-copytext copy-as-link" data-copy="{{ ticket.email }}" title="Нажмите, чтобы скопировать">{{ ticket.email }}</a>
+              {% else %}
+                <strong class="text-muted">—</strong>
+              {% endif %}
+            </div>
+            <div>
+              <span>Телефон</span>
+              {% if ticket.phone %}
+                <a href="#" class="kv-copytext copy-as-link" data-copy="{{ ticket.phone }}" title="Нажмите, чтобы скопировать">{{ ticket.phone }}</a>
+              {% else %}
+                <strong class="text-muted">—</strong>
+              {% endif %}
+            </div>
+            <div>
+              <span>ИНН</span>
+              {% if ticket.inn %}
+                <div class="kv-inn-row">
+                  <a href="#" class="kv-copytext copy-as-link" data-copy="{{ ticket.inn }}" title="Нажмите, чтобы скопировать">{{ ticket.inn }}</a>
+                  {% if is_operator or is_admin %}
+                    <a class="kv-inn-link" href="{{ url_for('admin_organization_card', inn=ticket.inn) }}" title="Открыть карточку организации" aria-label="Открыть карточку организации">{{ svg('eye','ico') }}</a>
+                  {% endif %}
+                </div>
+              {% else %}
+                <strong class="text-muted">—</strong>
+              {% endif %}
+            </div>
+            <div>
+              <span>Организация</span>
+              {% if ticket.organization %}
+                <a href="#" class="kv-copytext copy-as-link" data-copy="{{ ticket.organization }}" title="Нажмите, чтобы скопировать">{{ ticket.organization }}</a>
+              {% else %}
+                <strong class="text-muted">—</strong>
+              {% endif %}
+            </div>
+            <div>
+              <span>Адрес организации</span>
+              {% if ticket.address %}
+                <a href="#" class="kv-copytext copy-as-link" data-copy="{{ ticket.address }}" title="Нажмите, чтобы скопировать">{{ ticket.address }}</a>
+              {% else %}
+                <strong class="text-muted">—</strong>
+              {% endif %}
+            </div>
+            {# Важная задача выводим только в списке (TicketList) и в шапке как переключатель. В боковой панели не показываем. #}
+
+{% if is_operator or is_admin %}
+            <div>
+              <span>Отдел</span>
+              {# кликом по тексту копируем в буфер #}
+              {% if ticket.department %}
+                <a href="#" class="kv-copytext copy-as-link" data-copy="{{ ticket.department.name }}" title="Нажмите, чтобы скопировать">{{ ticket.department.name }}</a>
+              {% else %}
+                <strong class="text-muted">—</strong>
+              {% endif %}
+            </div>
+            <div>
+              <span>Доп. отделы</span>
+              {% if ticket.shared_departments_rel and ticket.shared_departments_rel|length > 0 %}
+                {% set shared_text = ticket.shared_departments_rel|map(attribute='name')|join(', ') %}
+                <a href="#" class="kv-copytext copy-as-link" id="sharedDeptsText" data-copy="{{ shared_text }}" title="Нажмите, чтобы скопировать">{{ shared_text }}</a>
+              {% else %}
+                <strong class="text-muted" id="sharedDeptsText">—</strong>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if is_operator or is_admin %}
+      <!-- Кто сейчас в заявке (real-time) -->
+      <div class="card mb-3" id="presenceCard" data-ticket-id="{{ ticket.id }}">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <span>В заявке сейчас</span>
+          <span class="text-muted small" id="presenceCount">—</span>
+        </div>
+        <div class="card-body" id="presenceBody">
+          <div class="text-muted small" id="presenceLoading">Загрузка...</div>
+          <div id="presenceList" class="presence-list" style="display:none"></div>
+          <div id="typingIndicator" class="text-muted small mt-2" style="display:none;"></div>
+          <div id="workIndicator" class="alert alert-warning py-1 px-2 mt-2 small" style="display:none;"></div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if is_operator or is_admin %}
+      <!-- Чат операторов (только внутри тикета) -->
+      <button type="button" class="opchat-fab" id="opChatFab" aria-label="Чат операторов" title="Чат операторов">
+        💬
+        <span class="opchat-badge" id="opChatBadge" hidden></span>
+      </button>
+      <div class="opchat-panel" id="opChatPanel" hidden>
+        <div class="opchat-header">
+          <div class="opchat-title">Чат операторов</div>
+          <button type="button" class="opchat-close" id="opChatClose" aria-label="Скрыть">×</button>
+        </div>
+        <div class="opchat-locked" id="opChatLockedNote" hidden>
+          Заявка закрыта — чат доступен только для чтения.
+        </div>
+        <div class="opchat-messages" id="opChatMessages"></div>
+        <form class="opchat-input" id="opChatForm" autocomplete="off">
+          <input type="text" id="opChatText" placeholder="Сообщение..." maxlength="2000" />
+          <button type="submit" class="opchat-send">Отпр.</button>
+        </form>
+      </div>
+      {% endif %}
+
+
+      <div class="card">
+        <div class="card-header">Подсказки</div>
+        <div class="card-body text-muted small">
+          <div class="mb-2">• Закрепляйте итоговый комментарий — без него нельзя завершить заявку.</div>
+          <div>• Нажмите «Ответить», чтобы цитировать и обратиться к автору.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Делегирование (выбор основного + доп. отделов) -->
+{% if (is_operator or is_admin) and ticket.status not in CLOSED_STATUSES %}
+<div class="modal fade" id="delegateModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content hd-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">Делегирование</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <form method="POST" id="delegateForm" action="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">
+        <input type="hidden" name="action" value="update_departments_sidebar">
+        <div class="modal-body">
+          <div class="text-muted small mb-2">Выберите основной отдел и дополнительные (мультивыбор). Основной отдел не добавляется в дополнительные.</div>
+          <div class="mb-3">
+            <label class="form-label">Основной отдел</label>
+            <select name="department_id" class="form-select" required>
+              <option value="" disabled {% if not ticket.department_id %}selected{% endif %}>— Выберите отдел —</option>
+              {% for dept in all_departments %}
+                <option value="{{ dept.id }}" {% if ticket.department_id and dept.id == ticket.department_id %}selected{% endif %}>{{ dept.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-1">
+            <label class="form-label">Доп. отделы</label>
+            <select name="shared_department_ids" class="form-select" multiple size="7">
+              {% for dept in all_departments %}
+                {% if ticket.department_id and dept.id == ticket.department_id %}
+                {% else %}
+                  <option value="{{ dept.id }}" {% if ticket.shared_departments_rel and (dept in ticket.shared_departments_rel) %}selected{% endif %}>{{ dept.name }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <div class="form-text">Можно выбрать несколько (Ctrl/Shift).</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-action-primary btn-sm">Применить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Модалка: запрос доработки от клиента -->
+<div class="modal fade" id="reworkModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content hd-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">Отправить на доработку</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="reworkForm" method="POST" action="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">
+        <div class="modal-body">
+          <input type="hidden" name="action" value="request_rework">
+          <div class="mb-2 text-muted small">Опишите, что нужно доделать. Оператор получит уведомление.</div>
+          <textarea class="form-control" id="reworkComment" name="message" rows="4" placeholder="Комментарий для оператора" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost btn-sm" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-action-primary btn-sm">Отправить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно для просмотра изображений -->
+<div class="image-modal" id="imageModal" onclick="closeImageModal(event)">
+    <div class="modal-image-container">
+        <span class="modal-close">&times;</span>
+        <img class="modal-image" id="modalImage" src="" alt="">
+        <div class="modal-caption" id="modalCaption"></div>
+    </div>
+</div>
+
+{% if is_operator or is_admin %}
+<!-- Модалка: вставка шаблона из базы знаний -->
+<div class="modal" id="kbTemplateModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Шаблоны из базы знаний</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex gap-2" style="flex-wrap:wrap; align-items:center;">
+          <input class="input" id="kbTplSearch" type="text" placeholder="Поиск (название, теги)…" style="flex:1; min-width:220px;">
+          <label class="d-flex gap-2" style="align-items:center;">
+            <input type="checkbox" id="kbTplFavOnly">
+            <span>Избранное</span>
+          </label>
+        </div>
+
+        <div id="kbTplList" style="margin-top:12px; display:flex; flex-direction:column; gap:10px;"></div>
+        <div id="kbTplEmpty" class="muted" style="margin-top:12px; display:none;">Ничего не найдено.</div>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-ghost" href="{{ url_for('knowledge') }}" target="_blank">Открыть базу знаний</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+// === Clipboard ===
+function showInlineCopied(anchorEl){
+  if (!anchorEl) return;
+  const prev = anchorEl.parentElement && anchorEl.parentElement.querySelector('.copy-inline');
+  if (prev) prev.remove();
+
+  const badge = document.createElement('span');
+  badge.className = 'copy-inline';
+  badge.textContent = 'Скопировано';
+  anchorEl.insertAdjacentElement('afterend', badge);
+
+  setTimeout(()=>{ badge.classList.add('is-hide'); }, 850);
+  setTimeout(()=>{ badge.remove(); }, 1250);
+}
+
+async function copyText(text, opts = {}) {
+  const { anchorEl = null, toast = true } = opts || {};
+  try {
+    await navigator.clipboard.writeText(text);
+    if (anchorEl) showInlineCopied(anchorEl);
+    if (toast) showAlert('Скопировано в буфер', 'success');
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      if (anchorEl) showInlineCopied(anchorEl);
+      if (toast) showAlert('Скопировано в буфер', 'success');
+    } catch (_) {
+      showAlert('Не удалось скопировать', 'danger');
+    }
+    document.body.removeChild(ta);
+  }
+}
+
+
+// === Visual BB editor (contenteditable -> BBCode) ===
+function bbcodeToHtml(bb) {
+  if (!bb) return '';
+  let s = bb;
+  // escape
+  s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // basic tags
+  s = s.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '<strong>$1</strong>');
+  s = s.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '<em>$1</em>');
+  s = s.replace(/\[s\]([\s\S]*?)\[\/s\]/gi, '<s>$1</s>');
+  s = s.replace(/\[code\]([\s\S]*?)\[\/code\]/gi, '<pre class="bb-code">$1</pre>');
+  s = s.replace(/\[quote\]([\s\S]*?)\[\/quote\]/gi, '<blockquote class="bb-quote">$1</blockquote>');
+  s = s.replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener">$2</a>');
+  s = s.replace(/\[url\]([^\[]+)\[\/url\]/gi, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  // list
+  s = s.replace(/\[list\]([\s\S]*?)\[\/list\]/gi, (m, inner) => {
+    const items = inner.split(/\[\*\]/).map(x => x.trim()).filter(Boolean);
+    return '<ul>' + items.map(i => `<li>${i}</li>`).join('') + '</ul>';
+  });
+  // new lines
+  s = s.replace(/\r\n|\r|\n/g, '<br>');
+  return s;
+}
+
+function htmlToBbcode(html) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html || '';
+
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node.nodeValue;
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    const tag = node.tagName.toLowerCase();
+
+    // block handling
+    if (tag === 'br') return '\n';
+    if (tag === 'strong' || tag === 'b') return `[b]${children(node)}[/b]`;
+    if (tag === 'em' || tag === 'i') return `[i]${children(node)}[/i]`;
+    if (tag === 's' || tag === 'strike' || tag === 'del') return `[s]${children(node)}[/s]`;
+    if (tag === 'a') {
+      const href = node.getAttribute('href') || '';
+      const txt = children(node) || href;
+      return href ? `[url=${href}]${txt}[/url]` : txt;
+    }
+    if (tag === 'blockquote') return `[quote]${children(node)}[/quote]\n`;
+    if (tag === 'pre') return `[code]${node.textContent || ''}[/code]\n`;
+    if (tag === 'ul') {
+      const li = Array.from(node.querySelectorAll(':scope > li')).map(x => `[*]${(x.textContent || '').trim()}`).join('\n');
+      return `[list]\n${li}\n[/list]\n`;
+    }
+    if (tag === 'div' || tag === 'p') return `${children(node)}\n`;
+    return children(node);
+  }
+  function children(el) {
+    return Array.from(el.childNodes).map(walk).join('');
+  }
+
+  let out = Array.from(wrap.childNodes).map(walk).join('');
+  // cleanup extra newlines
+  out = out.replace(/\n{3,}/g, '\n\n').trim();
+  return out;
+}
+
+function insertHtmlAtCaret(html) {
+  document.execCommand('insertHTML', false, html);
+}
+
+function initVisualEditors() {
+  document.querySelectorAll('form').forEach((form) => {
+    const editor = form.querySelector('.bb-editor');
+    const hidden = form.querySelector('.bb-hidden');
+    const bar = form.querySelector('.bb-toolbar');
+    if (!editor || !hidden || !bar) return;
+    if (form.dataset.bbInited === '1') return;
+    form.dataset.bbInited = '1';
+
+    // placeholder
+    editor.addEventListener('input', () => {
+      editor.classList.toggle('is-empty', editor.textContent.trim().length === 0);
+      // sync hidden field so HTML5 validation won't block submit
+      hidden.value = htmlToBbcode(editor.innerHTML);
+    });
+    editor.classList.toggle('is-empty', editor.textContent.trim().length === 0);
+
+    bar.addEventListener('click', (e) => {
+      const btn = e.target.closest('.bb-btn');
+      if (!btn) return;
+      editor.focus();
+      const cmd = btn.dataset.cmd;
+      const action = btn.dataset.action;
+      if (cmd) {
+        document.execCommand(cmd, false, null);
+        return;
+      }
+      if (action === 'link') {
+        const url = prompt('Введите URL');
+        if (!url) return;
+        const sel = window.getSelection();
+        const text = sel && sel.toString() ? sel.toString() : url;
+        insertHtmlAtCaret(`<a href="${url}" target="_blank" rel="noopener">${text}</a>`);
+        return;
+      }
+      if (action === 'quote') {
+        insertHtmlAtCaret('<blockquote class="bb-quote"><br></blockquote>');
+        return;
+      }
+      if (action === 'code') {
+        insertHtmlAtCaret('<pre class="bb-code"></pre><br>');
+        return;
+      }
+      if (action === 'list') {
+        insertHtmlAtCaret('<ul><li></li></ul>');
+        return;
+      }
+      if (action === 'kb') {
+        if (window.HDKB) window.HDKB.openFor(editor);
+        return;
+      }
+    });
+
+    // before submit: serialize to BBCode
+    form.addEventListener('submit', (e) => {
+      hidden.value = htmlToBbcode(editor.innerHTML);
+      if (!hidden.value || hidden.value.trim().length === 0) {
+        e.preventDefault();
+        showAlert('Введите сообщение', 'warning');
+        editor.focus();
+        return false;
+      }
+    });
+  });
+}
+
+function initCopyButtons() {
+  if (document.body.dataset.copyInited === '1') return;
+  document.body.dataset.copyInited = '1';
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.kv-copy');
+    if (btn) {
+      const txt = btn.dataset.copy || btn.textContent.trim();
+      copyText(txt, { toast: true });
+      return;
+    }
+
+    const txtEl = e.target.closest('.kv-copytext');
+    if (txtEl) {
+      // kv-copytext может быть ссылкой (href="#"), чтобы выглядело кликабельно — не даём странице прыгать
+      e.preventDefault();
+      const txt = txtEl.dataset.copy || txtEl.textContent.trim();
+      if (txt) copyText(txt, { toast: true });
+      return;
+    }
+  });
+}
+
+// === Knowledge Base templates (operator only) ===
+window.HDKB = (function(){
+  let activeEditor = null;
+  let debounceT = null;
+  let lastQuery = '';
+  let lastFav = false;
+
+  const modalId = 'kbTemplateModal';
+  const $ = (id) => document.getElementById(id);
+
+  function openFor(editorEl){
+    activeEditor = editorEl;
+    // reset
+    const q = $('kbTplSearch');
+    if (q) q.value = '';
+    const fav = $('kbTplFavOnly');
+    if (fav) fav.checked = false;
+    lastQuery = '';
+    lastFav = false;
+    if (window.HDUI) window.HDUI.showModalById(modalId);
+    load();
+    setTimeout(()=>{ q && q.focus(); }, 50);
+  }
+
+  async function load(){
+    const q = ($('kbTplSearch')?.value || '').trim();
+    const fav = !!$('kbTplFavOnly')?.checked;
+    if (q === lastQuery && fav === lastFav) return;
+    lastQuery = q; lastFav = fav;
+
+    const list = $('kbTplList');
+    const empty = $('kbTplEmpty');
+    if (list) list.innerHTML = '<div class="muted">Загрузка…</div>';
+    if (empty) empty.style.display = 'none';
+
+    try{
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      if (fav) params.set('fav', '1');
+      params.set('limit', '50');
+      const res = await fetch('/api/kb/templates?' + params.toString(), {headers:{'X-Requested-With':'XMLHttpRequest'}});
+      const data = await res.json();
+      const items = (data && data.success && data.items) ? data.items : [];
+      render(items);
+    }catch(e){
+      if (list) list.innerHTML = '<div class="muted">Не удалось загрузить шаблоны</div>';
+    }
+  }
+
+  function render(items){
+    const list = $('kbTplList');
+    const empty = $('kbTplEmpty');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!items || items.length === 0){
+      if (empty) empty.style.display = '';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    items.forEach((it)=>{
+      const row = document.createElement('div');
+      row.className = 'kb-row';
+      row.style.cssText = 'display:flex; gap:10px; align-items:flex-start; justify-content:space-between; border:1px solid var(--border); border-radius:14px; padding:10px;';
+      const left = document.createElement('div');
+      left.style.minWidth = '0';
+      left.innerHTML = `
+        <div style="font-weight:800; margin-bottom:2px;">${escapeHtml(it.title || '')}</div>
+        <div class="muted" style="font-size:12px;">${escapeHtml(it.category || '')}</div>
+      `;
+      const right = document.createElement('div');
+      right.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; align-items:center;';
+
+      const favBtn = document.createElement('button');
+      favBtn.type = 'button';
+      favBtn.className = 'btn btn-ghost btn-sm';
+      favBtn.title = 'В избранное';
+      favBtn.textContent = it.is_favorite ? '★' : '☆';
+      favBtn.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        try{
+          const r = await fetch(`/api/kb/favorite/${it.id}`, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}});
+          const d = await r.json();
+          if(d && d.success){
+            favBtn.textContent = d.is_favorite ? '★' : '☆';
+            it.is_favorite = !!d.is_favorite;
+            // если включён фильтр избранного — перезагрузим список
+            if ($('kbTplFavOnly')?.checked) load();
+          }
+        }catch(_){ }
+      });
+
+      const insBtn = document.createElement('button');
+      insBtn.type = 'button';
+      insBtn.className = 'btn btn-primary btn-sm';
+      insBtn.textContent = 'Вставить';
+      insBtn.addEventListener('click', ()=> insertTemplate(it));
+
+      const openBtn = document.createElement('a');
+      openBtn.className = 'btn btn-secondary btn-sm';
+      openBtn.href = it.url;
+      openBtn.target = '_blank';
+      openBtn.textContent = 'Открыть';
+
+      right.appendChild(favBtn);
+      right.appendChild(insBtn);
+      right.appendChild(openBtn);
+      row.appendChild(left);
+      row.appendChild(right);
+      list.appendChild(row);
+    });
+  }
+
+  function insertTemplate(it){
+    if (!activeEditor) return;
+    const summary = (it.summary || '').trim();
+    const link = it.url ? `\n\n[url=${it.url}]Подробная инструкция: ${it.title}[/url]` : '';
+    const bb = (summary ? summary : '') + link + '\n';
+    const html = bbcodeToHtml(bb);
+    activeEditor.focus();
+    insertHtmlAtCaret(html);
+    // закрываем модалку
+    if (window.HDUI) window.HDUI.hideModalById(modalId);
+  }
+
+  function escapeHtml(s){
+    return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  }
+
+  function bind(){
+    const q = $('kbTplSearch');
+    const fav = $('kbTplFavOnly');
+    if (q && !q.dataset.bind){
+      q.dataset.bind = '1';
+      q.addEventListener('input', ()=>{
+        clearTimeout(debounceT);
+        debounceT = setTimeout(load, 180);
+      });
+    }
+    if (fav && !fav.dataset.bind){
+      fav.dataset.bind = '1';
+      fav.addEventListener('change', load);
+    }
+  }
+
+  // bind once on DOM ready
+  document.addEventListener('DOMContentLoaded', bind);
+
+  return { openFor, load };
+})();
+
+function initTicketPage() {
+  initVisualEditors();
+  initCopyButtons();
+  initCommentEdit();
+  initDraftAndShortcuts();
+}
+
+// === Draft reply + Ctrl+Enter ===
+function initDraftAndShortcuts(){
+  const editor = document.getElementById('commentMessage');
+  const form = document.getElementById('commentForm');
+  if(!editor || !form) return;
+
+  const key = 'hd_draft_ticket_' + String({{ ticket.id }});
+
+  // restore
+  try{
+    const raw = localStorage.getItem(key);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(d && typeof d.html === 'string' && d.html.trim() && !editor.innerHTML.trim()){
+        editor.innerHTML = d.html;
+        // небольшой мягкий тост
+        if(window.HDUI && window.HDUI.toast){
+          window.HDUI.toast('Черновик восстановлен');
+        }
+      }
+    }
+  }catch(e){}
+
+  // save (debounced)
+  let t = null;
+  const save = () => {
+    try{
+      const html = editor.innerHTML || '';
+      if(!html.replace(/<br\s*\/?>(\s*)/g,'').trim()){
+        localStorage.removeItem(key);
+        return;
+      }
+      localStorage.setItem(key, JSON.stringify({ html, ts: Date.now() }));
+    }catch(e){}
+  };
+  editor.addEventListener('input', () => {
+    if(t) clearTimeout(t);
+    t = setTimeout(save, 300);
+  });
+
+  // Ctrl+Enter отправка
+  editor.addEventListener('keydown', (ev) => {
+    if((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter'){
+      ev.preventDefault();
+      try{ form.requestSubmit(); }catch(e){ form.submit(); }
+    }
+  });
+
+  // clear on submit
+  form.addEventListener('submit', () => {
+    try{ localStorage.removeItem(key); }catch(e){}
+  });
+}
+
+// === Inline comment edit ===
+function initCommentEdit() {
+  if (document.body.dataset.editInited === '1') return;
+  document.body.dataset.editInited = '1';
+  document.querySelectorAll('.edit-comment-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.commentId;
+      const item = document.getElementById('comment-' + id);
+      const body = item?.querySelector('.comment-body');
+      const form = document.getElementById('edit-form-' + id);
+      if (!body || !form) return;
+      const editor = form.querySelector('.bb-editor');
+      const hidden = form.querySelector('.bb-hidden');
+      // В редактор кладём исходный BBCode (data-raw), чтобы при редактировании не пропадали теги
+      const raw = body.dataset.raw || '';
+      if (editor) editor.innerHTML = bbcodeToHtml(raw);
+      if (hidden) hidden.value = raw;
+      form.style.display = '';
+      body.style.display = 'none';
+      editor?.focus();
+    });
+  });
+
+  document.querySelectorAll('.cancel-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.commentId;
+      const item = document.getElementById('comment-' + id);
+      const body = item?.querySelector('.comment-body');
+      const form = document.getElementById('edit-form-' + id);
+      if (!body || !form) return;
+      form.style.display = 'none';
+      body.style.display = '';
+    });
+  });
+}
+
+// Открытие модального окна изображения
+function openImageModal(src, caption) {
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    const modalCaption = document.getElementById('modalCaption');
+
+    modalImg.src = src;
+    modalCaption.textContent = caption || 'Изображение';
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+// Закрытие модального окна
+function closeImageModal(event) {
+    const modal = document.getElementById('imageModal');
+    if (event.target === modal || event.target.classList.contains('modal-close')) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+// Закрытие по нажатию клавиши Esc
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('imageModal');
+        if (modal.classList.contains('active')) {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+});
+
+// Функция для показа уведомлений
+function showAlert(message, type = 'danger') {
+    document.querySelectorAll('.alert-container').forEach(alert => alert.remove());
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-container`;
+    alertDiv.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 99999; min-width: 280px; max-width: 90vw;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" aria-label="Закрыть"></button>
+    `;
+    document.body.appendChild(alertDiv);
+
+    alertDiv.querySelector('.btn-close')?.addEventListener('click', () => alertDiv.remove());
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// Копирование ссылки на тикет
+window.copyTicketLink = function() {
+    const url = window.location.href;
+    const ok = () => showAlert('Ссылка скопирована', 'success');
+    const fail = () => {
+      // Фоллбек для http/старых браузеров
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand('copy');
+        ok();
+      } catch (e) {
+        prompt('Скопируйте ссылку:', url);
+      } finally {
+        ta.remove();
+      }
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).then(ok).catch(fail);
+    } else {
+      fail();
+    }
+};
+
+// Отметка "Важная задача" (только оператор/админ)
+window.toggleImportantTask = async function() {
+  try {
+    const resp = await fetch("{{ url_for('toggle_ticket_critical', ticket_id=ticket.id) }}", {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data || !data.success) {
+      showAlert(data && data.message ? data.message : 'Не удалось изменить отметку', 'danger');
+      return;
+    }
+    const btn = document.querySelector('.important-toggle-btn');
+    const isOn = !!(data.is_important ?? data.is_critical);
+    if (btn) {
+      btn.classList.toggle('is-active', isOn);
+      const t = btn.querySelector('.important-toggle-text');
+      if (t) t.textContent = isOn ? 'Важная задача' : 'Сделать важной задачей';
+    }
+    showAlert(isOn ? 'Отмечено как важная задача' : 'Отметка снята', 'success');
+  } catch (e) {
+    showAlert('Ошибка сети при изменении отметки', 'danger');
+  }
+};
+
+// Открытие модального окна делегирования
+window.openDelegateModal = function() {
+    if (window.HDUI) window.HDUI.showModalById('delegateModal');
+};
+
+// Модалка отделов теперь открывается только из «Делегировать»
+
+// Обработка формы делегирования
+document.addEventListener('DOMContentLoaded', function() {
+    initTicketPage();
+
+    const delegateForm = document.getElementById('delegateForm');
+    if (delegateForm) {
+        delegateForm.addEventListener('submit', function(e) {
+            // Форма отправится стандартным способом
+        });
+    }
+});
+
+// Закрепить комментарий как результат
+document.addEventListener('click', function(e) {
+    const pinBtn = e.target.closest('.pin-result-btn');
+    if (pinBtn) {
+        const commentId = pinBtn.dataset.commentId;
+        if (!commentId) return;
+        fetch(`/api/ticket/{{ ticket.id }}/comment/${commentId}/pin-as-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                showAlert('Ошибка: ' + (data.error || 'Не удалось закрепить'), 'danger');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showAlert('Ошибка сети', 'danger');
+        });
+    }
+});
+
+// Открепить результат
+document.addEventListener('click', function(e) {
+    const unpinBtn = e.target.closest('.unpin-btn');
+    if (unpinBtn) {
+        if (!confirm('Открепить этот комментарий как официальный результат?')) return;
+        fetch(`/api/ticket/{{ ticket.id }}/unpin-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin'
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + (data.error || 'Не удалось открепить'));
+            }
+        })
+        .catch(err => {
+            console.error('Unpin error:', err);
+            alert('Ошибка сети при откреплении');
+        });
+    }
+});
+
+// Обработка кнопки "Ответить"
+document.addEventListener('click', function(e) {
+    const replyBtn = e.target.closest('.reply-btn');
+    if (replyBtn) {
+        const commentId = replyBtn.dataset.commentId;
+        const username = replyBtn.dataset.username;
+        const commentElement = document.getElementById('comment-' + commentId);
+        const commentBody = commentElement.querySelector('.comment-body');
+
+        const quoted = (commentBody.innerText || '').trim();
+        const editor = document.getElementById('commentMessage');
+        if (!editor) return;
+        const esc = (t) => (t || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const citationHtml = `<blockquote class="bb-quote"><strong>${esc(username)}</strong><br>${esc(quoted).replace(/\n/g,'<br>')}</blockquote><br>`;
+        editor.innerHTML = citationHtml + (editor.innerHTML || '');
+        editor.focus();
+    }
+});
+
+// Раньше тут была обработка HTML-цитаты. Теперь цитата — BBCode, отдельный хендлер не нужен.
+
+// Переключение табов
+const tabButtons = document.querySelectorAll('[data-tab]');
+tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('d-none'));
+        btn.classList.add('active');
+        const target = btn.getAttribute('data-tab');
+        const targetElement = document.getElementById('tab-' + target);
+        if (targetElement) {
+            targetElement.classList.remove('d-none');
+        }
+        if (target === 'history') {
+            loadTicketHistory();
+        }
+    });
+});
+
+// Загрузка истории
+function loadTicketHistory() {
+    const container = document.getElementById('ticketHistory');
+    if (!container) return;
+    fetch(`/api/ticket/{{ ticket.id }}/history`)
+    .then(r => r.json())
+    .then(history => {
+        if (!history || history.length === 0) {
+            container.innerHTML = '<p class="text-muted small">История отсутствует</p>';
+            return;
+        }
+        let html = '';
+        history.forEach(r => {
+            const time = new Date(r.timestamp).toLocaleString('ru-RU');
+            let description = r.description;
+            if (!description && r.field_display) {
+                if (r.field === 'priority') {
+                    description = `${r.field_display}: ${r.old_value_display} → ${r.new_value_display}`;
+                } else {
+                    description = `${r.field_display}: ${r.old_value || '—'} → ${r.new_value || '—'}`;
+                }
+            }
+            html += `
+                <div class="history-item">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <div class="d-flex align-items-center">
+                            <i class="bi ${r.icon || 'bi-info-circle'} ${r.color || 'text-muted'} me-2"></i>
+                            <strong class="small">${r.username}</strong>
+                        </div>
+                        <small class="text-muted">${time}</small>
+                    </div>
+                    <div class="small ms-4 ${r.color || 'text-muted'}">
+                        ${description}
+                        ${r.note ? `<div class="text-muted fst-italic mt-1 small">${r.note}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    })
+    .catch(() => {
+        container.innerHTML = '<p class="text-danger small">Ошибка загрузки истории</p>';
+    });
+}
+
+// Таймер обратного отсчета для клиента
+{% if ticket.status == 'Ожидание' and ticket.marked_as_completed_at and is_client %}
+document.addEventListener('DOMContentLoaded', function() {
+    initTicketPage();
+    const markedTime = new Date("{{ ticket.marked_as_completed_at.isoformat() }}");
+    const deadline = new Date(markedTime.getTime() + 24 * 60 * 60 * 1000);
+    function updateTimer() {
+        const now = new Date();
+        const diff = deadline - now;
+        if (diff <= 0) {
+            document.getElementById('countdown-timer').innerHTML = 'Время истекло';
+            setTimeout(() => location.reload(), 1000);
+            return;
+        }
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        document.getElementById('countdown-timer').innerHTML =
+            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    updateTimer();
+    setInterval(updateTimer, 1000);
+});
+{% endif %}
+
+// Создание задачи в Битрикс (без jQuery)
+document.addEventListener('DOMContentLoaded', function() {
+    initTicketPage();
+
+    // Preview selected attachments for comments
+    const fileInput = document.getElementById('commentFiles');
+    const preview = document.getElementById('commentFilePreview');
+    if (fileInput && preview) {
+      const fmt = (n)=>{
+        const kb = n/1024;
+        if (kb < 1024) return Math.round(kb) + ' KB';
+        return (kb/1024).toFixed(1) + ' MB';
+      };
+      fileInput.addEventListener('change', () => {
+        const files = Array.from(fileInput.files || []);
+        if (!files.length) {
+          preview.style.display = 'none';
+          preview.innerHTML = '';
+          return;
+        }
+        preview.style.display = '';
+        preview.innerHTML = files.map(f => (
+          `<div class="file-item"><span>${f.name}</span><span class="text-muted">${fmt(f.size)}</span></div>`
+        )).join('');
+      });
+    }
+
+    const bitrixBtn = document.getElementById('create-bitrix-task-btn');
+    if (bitrixBtn) {
+        bitrixBtn.addEventListener('click', function() {
+            const btn = this;
+            const ticketId = {{ ticket.id }};
+            
+            if (!confirm('Создать задачу в Битрикс24 для этой заявки?')) {
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Создание...';
+            
+            fetch('/create_bitrix_task/' + ticketId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Заменяем кнопку на ссылку без перезагрузки
+                    const url = data.url;
+                    const label = data.label || (data.task_id ? ('Задача Битрикс №' + data.task_id) : 'Задача Битрикс');
+                    const a = document.createElement('a');
+                    a.className = 'btn btn-action btn-sm';
+                    a.id = 'bitrix-task-link';
+                    a.href = url;
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    a.innerHTML = '<i class="bi bi-box-arrow-up-right"></i> ' + label;
+                    btn.replaceWith(a);
+                    // короткое уведомление
+                    if (window.HDUI && window.HDUI.toast) window.HDUI.toast('Задача создана в Битрикс24', 'success');
+                } else {
+                    alert('❌ ' + (data.error || 'Ошибка при создании задачи'));
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check2-square me-1"></i> Создать задачу в Битрикс';
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                alert('❌ Ошибка сервера при создании задачи');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check2-square me-1"></i> Создать задачу в Битрикс';
+            });
+        });
+    }
+});
+
+// Открыть модальное окно для доработки
+window.requestRework = function() {
+    const el = document.getElementById('reworkModal');
+    if(!el) return;
+    try{
+      if(window.bootstrap && window.bootstrap.Modal){
+        window.bootstrap.Modal.getOrCreateInstance(el).show();
+        return;
+      }
+    }catch(e){}
+    // fallback
+    if (window.HDUI) window.HDUI.showModalById('reworkModal');
+};
+
+// Отправить на доработку - валидация перед отправкой
+document.getElementById('reworkForm')?.addEventListener('submit', function(e) {
+    const comment = document.getElementById('reworkComment').value.trim();
+    
+    if (!comment) {
+        e.preventDefault();
+        showAlert('Введите комментарий для оператора', 'warning');
+        return;
+    }
+    
+    // Добавляем подтверждение
+    if (!confirm('Отправить заявку на доработку? Оператор получит уведомление.')) {
+        e.preventDefault();
+        return;
+    }
+});
+    </script>
+
+    {% if is_operator or is_admin %}
+    <script>
+      window.CURRENT_USER_ID = {{ current_user.id }};
+    </script>
+    {% endif %}
+
+    <!-- Presence logic (online viewers / typing) -->
+    <script src="{{ url_for('static', filename='js/presence.js') }}" data-ticket-id="{{ ticket.id }}"></script>
+
+    {% if is_operator or is_admin %}
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/opchat.css') }}">
+      <script src="{{ url_for('static', filename='js/opchat.js') }}" data-ticket-id="{{ ticket.id }}"></script>
+    {% endif %}
+
+    {% if is_operator or is_admin %}
+      <script src="{{ url_for('static', filename='js/shared_departments.js') }}"></script>
+    {% endif %}
+
+{% endblock %}

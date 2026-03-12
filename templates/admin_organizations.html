@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Организации{% endblock %}
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<style>
+.org-page{display:grid;gap:12px}
+.org-hero,.org-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-sm)}
+.org-hero{padding:14px 16px}
+.org-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.org-title{margin:0;font-size:1.7rem;font-weight:800}
+.org-subtitle{margin:4px 0 0;color:var(--muted);line-height:1.45;font-size:.92rem;max-width:860px}
+.org-count{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-size:.82rem;color:var(--muted)}
+.org-toolbar{margin-top:12px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.org-search{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.org-input{min-width:260px;max-width:360px;width:100%;padding:8px 10px;height:36px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text)}
+.org-btn{padding:7px 11px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);text-decoration:none;color:var(--text);font-size:.84rem;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.org-btn:hover{border-color:color-mix(in oklab, var(--accent) 30%, var(--border));background:color-mix(in oklab, var(--accent) 6%, var(--surface))}
+.org-btn--primary{background:color-mix(in oklab, var(--accent) 12%, var(--surface));border-color:color-mix(in oklab, var(--accent) 34%, var(--border))}
+.org-card{overflow:hidden}
+.org-table-wrap{overflow:auto}
+.org-table{width:100%;border-collapse:separate;border-spacing:0;font-size:.86rem}
+.org-table thead th{position:sticky;top:0;z-index:1;padding:10px 12px;background:var(--surface-2);border-bottom:1px solid var(--border);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:800}
+.org-table tbody td{padding:10px 12px;border-bottom:1px solid color-mix(in oklab, var(--border) 78%, transparent);vertical-align:top}
+.org-table tbody tr:hover{background:color-mix(in oklab, var(--accent) 3%, var(--surface))}
+.org-name{font-weight:700;color:var(--text);text-decoration:none;font-size:.92rem}
+.org-meta{display:grid;gap:3px}
+.org-muted{color:var(--muted);font-size:.78rem}
+.org-address{max-width:300px;color:var(--muted)}
+.org-badge{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;padding:0 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-size:.76rem;font-weight:700}
+.org-tickets{display:grid;gap:3px}
+.org-actions{display:flex;gap:6px;flex-wrap:wrap}
+.org-action{padding:4px 10px;height:30px;border-radius:8px;font-size:.76rem}
+.org-action--danger:hover{border-color:color-mix(in oklab, var(--danger) 35%, var(--border));background:color-mix(in oklab, var(--danger) 8%, var(--surface))}
+.org-compact{white-space:nowrap}
+.org-empty{padding:26px;text-align:center;color:var(--muted)}
+.org-modal{border:none;border-radius:18px;padding:0;max-width:580px;width:min(580px,calc(100vw - 24px));background:var(--surface);color:var(--text);box-shadow:0 26px 60px rgba(15,23,42,.35)}
+.org-modal::backdrop{background:rgba(7,12,22,.62);backdrop-filter:blur(2px)}
+.org-modal__head,.org-modal__body,.org-modal__foot{padding:16px 18px}
+.org-modal__head{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
+.org-modal__title{margin:0;font-size:1rem;font-weight:800}
+.org-modal__close{width:34px;height:34px;border-radius:999px;padding:0;font-size:1.1rem;line-height:1}
+.org-modal__body{display:grid;gap:12px;background:var(--surface)}
+.org-form-grid{display:grid;gap:12px}
+.org-form-row{display:grid;gap:6px}
+.org-form-row label{font-size:.8rem;color:var(--muted);font-weight:600}
+.org-form-row input{padding:9px 11px;height:40px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--text)}
+.org-form-row input:focus{outline:none;border-color:color-mix(in oklab, var(--accent) 55%, var(--border));box-shadow:0 0 0 3px color-mix(in oklab, var(--accent) 14%, transparent)}
+.org-modal__foot{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border)}
+@media (max-width: 980px){.org-table thead th:nth-child(5),.org-table tbody td:nth-child(5),.org-table thead th:nth-child(6),.org-table tbody td:nth-child(6){display:none}}
+@media (max-width: 720px){.org-head,.org-toolbar{align-items:stretch}.org-count{align-self:flex-start}.org-input{max-width:none;min-width:0}.org-table thead th:nth-child(3),.org-table tbody td:nth-child(3){display:none}}
+</style>
+<div class="org-page">
+  <div class="org-hero">
+    <div class="org-head">
+      <div>
+        <h1 class="org-title">Организации</h1>
+        <p class="org-subtitle">Компактный реестр организаций из профилей клиентов и заявок. Здесь можно быстро найти организацию, поправить реквизиты или удалить запись из реестра.</p>
+      </div>
+      <div class="org-count">Всего: {{ organizations_count }}</div>
+    </div>
+    <div class="org-toolbar">
+        <form method="get" class="org-search">
+          <input class="org-input" type="search" name="q" value="{{ q or '' }}" placeholder="Поиск по названию, ИНН или адресу">
+          <button class="org-btn org-btn--primary" type="submit">Найти</button>
+          {% if q %}<a class="org-btn" href="{{ url_for('admin_organizations') }}">Сбросить</a>{% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="org-card">
+    <div class="org-table-wrap">
+      {% if organizations %}
+      <table class="org-table">
+        <thead>
+          <tr>
+            <th>Организация</th>
+            <th>ИНН</th>
+            <th>Адрес</th>
+            <th>Клиенты</th>
+            <th>Заявки</th>
+            <th>Активность</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for org in organizations %}
+          <tr>
+            <td>
+              <div class="org-meta">
+                {% if org.has_card %}<a class="org-name" href="{{ url_for('admin_organization_card', inn=org.inn) }}">{{ org.name }}</a>{% else %}<span class="org-name">{{ org.name }}</span>{% endif %}
+                <span class="org-muted">Ключ: {{ org.key }}</span>
+              </div>
+            </td>
+            <td class="org-compact">{{ org.inn or '—' }}</td>
+            <td class="org-address">{{ org.address or '—' }}</td>
+            <td><span class="org-badge">{{ org.users_count }}</span></td>
+            <td>
+              <div class="org-meta">
+                <span class="org-badge">Всего {{ org.tickets_count }}</span>
+                <span class="org-muted">Открыто: {{ org.open_tickets_count }}</span>
+              </div>
+            </td>
+            <td class="org-compact">{{ org.last_activity.strftime('%d.%m.%Y %H:%M') if org.last_activity else '—' }}</td>
+            <td>
+              <div class="org-actions">
+                <button class="org-btn org-action" type="button" onclick='openOrgEdit({{ {"key": org.key, "name": org.name, "inn": org.inn or "", "address": org.address or "", "q": q or ""}|tojson|safe }})'>Редактировать</button>
+                <form method="post" onsubmit="return confirm('Удалить организацию из реестра и очистить её реквизиты в связанных профилях и заявках?');">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="key" value="{{ org.key }}">
+                  <input type="hidden" name="q" value="{{ q or '' }}">
+                  <button class="org-btn org-action org-action--danger" type="submit">Удалить</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="org-empty">Организации не найдены.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<dialog id="orgEditDialog" class="org-modal">
+  <form method="post">
+    <div class="org-modal__head">
+      <h3 class="org-modal__title">Редактирование организации</h3>
+      <button class="org-btn org-modal__close" type="button" onclick="closeOrgEdit()" aria-label="Закрыть">×</button>
+    </div>
+    <div class="org-modal__body">
+      <div class="org-form-grid">
+      <input type="hidden" name="action" value="edit">
+      <input type="hidden" name="key" id="orgEditKey">
+      <input type="hidden" name="q" id="orgEditQuery" value="{{ q or '' }}">
+      <div class="org-form-row">
+        <label for="orgEditName">Название</label>
+        <input id="orgEditName" name="name" maxlength="200" required>
+      </div>
+      <div class="org-form-row">
+        <label for="orgEditInn">ИНН</label>
+        <input id="orgEditInn" name="inn" maxlength="12" inputmode="numeric">
+      </div>
+      <div class="org-form-row">
+        <label for="orgEditAddress">Адрес</label>
+        <input id="orgEditAddress" name="address" maxlength="300">
+      </div>
+    </div>
+    </div>
+    <div class="org-modal__foot">
+      <button class="org-btn" type="button" onclick="closeOrgEdit()">Отмена</button>
+      <button class="org-btn org-btn--primary" type="submit">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+function openOrgEdit(data){
+  const dlg=document.getElementById('orgEditDialog');
+  document.getElementById('orgEditKey').value=data.key||'';
+  document.getElementById('orgEditName').value=data.name||'';
+  document.getElementById('orgEditInn').value=data.inn||'';
+  document.getElementById('orgEditAddress').value=data.address||'';
+  document.getElementById('orgEditQuery').value=data.q||'';
+  if(dlg && typeof dlg.showModal==='function'){dlg.showModal();}
+}
+function closeOrgEdit(){
+  const dlg=document.getElementById('orgEditDialog');
+  if(dlg){dlg.close();}
+}
+</script>
+{% endblock %}

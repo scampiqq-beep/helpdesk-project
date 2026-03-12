@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from 'partials/svg.html' import svg %}
+
+{% block title %}Управление базой знаний{% endblock %}
+
+{% block extra_css %}
+<style>
+.kb-admin-page .page-title{font-size:1.36rem;line-height:1.05}
+.kb-admin-page .muted{font-size:.82rem}
+.kb-admin-grid{gap:8px !important;margin-top:8px !important}
+.kb-admin-grid .card-header{padding:8px 10px;font-size:.86rem}
+.kb-admin-grid .card-body{padding:8px 10px}
+.kb-admin-row{padding:5px 0;border-bottom:1px solid rgba(148,163,184,.10)}
+.kb-admin-row:last-child{border-bottom:0;padding-bottom:0}
+.kb-admin-row .muted{font-size:.74rem;margin-top:1px !important}
+.kb-admin-actions .btn{padding:4px 9px;font-size:.78rem;min-height:28px}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex kb-admin-page" style="align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap;">
+  <div>
+    <h1 class="page-title" style="margin:0;">Управление базой знаний</h1>
+    <div class="muted" style="margin-top:4px;">Категории, статьи и краткие шаблоны для вставки в комментарии.</div>
+  </div>
+  <div class="d-flex gap-2 kb-admin-actions" style="flex-wrap:wrap;">
+    <a class="btn btn-secondary" href="{{ url_for('knowledge') }}">{{ svg('book') }}К базе знаний</a>
+    <a class="btn btn-primary" href="{{ url_for('kb_article_add') }}">{{ svg('edit') }}Добавить статью</a>
+    <a class="btn btn-ghost" href="{{ url_for('kb_category_add') }}">+ Категория</a>
+  </div>
+</div>
+
+<div class="kb-admin-grid" style="display:grid; grid-template-columns: 1fr; gap:8px; margin-top:8px;">
+  <div class="card">
+    <div class="card-header">Категории</div>
+    <div class="card-body" style="display:flex; flex-direction:column; gap:6px;">
+      {% if categories|length == 0 %}
+        <div class="muted">Категорий пока нет.</div>
+      {% else %}
+        {% for c in categories %}
+          <div class="kb-admin-row" style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
+            <div style="min-width:0;">
+              <div style="font-weight:700;">{{ c.title }}</div>
+              <div class="muted">Порядок: {{ c.sort_order }} · {% if c.is_active %}активна{% else %}выключена{% endif %}</div>
+            </div>
+            <div class="d-flex gap-2 kb-admin-actions" style="flex-wrap:wrap;">
+              <a class="btn btn-secondary btn-sm" href="{{ url_for('kb_category_edit', category_id=c.id) }}">Редактировать</a>
+              <form method="post" action="{{ url_for('kb_category_delete', category_id=c.id) }}" onsubmit="return confirm('Удалить категорию? Статьи в ней тоже удалятся.');">
+                <button class="btn btn-danger btn-sm" type="submit">Удалить</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Статьи</div>
+    <div class="card-body" style="display:flex; flex-direction:column; gap:6px;">
+      {% if articles|length == 0 %}
+        <div class="muted">Статей пока нет.</div>
+      {% else %}
+        {% for a in articles %}
+          <div class="kb-admin-row" style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
+            <div style="min-width:0;">
+              <a href="{{ url_for('kb_article', article_id=a.id) }}" style="font-weight:700; text-decoration:none;">{{ a.title }}</a>
+              <div class="muted" style="margin-top:4px;">
+                {% if a.category %}{{ a.category.title }}{% else %}Без категории{% endif %}
+                · {% if a.is_published %}опубликована{% else %}черновик{% endif %}
+                · обновлено: {{ a.updated_at.strftime('%d.%m.%Y %H:%M') if a.updated_at else '' }}
+              </div>
+            </div>
+            <div class="d-flex gap-2 kb-admin-actions" style="flex-wrap:wrap;">
+              <a class="btn btn-secondary btn-sm" href="{{ url_for('kb_article_edit', article_id=a.id) }}">Редактировать</a>
+              <form method="post" action="{{ url_for('kb_article_delete', article_id=a.id) }}" onsubmit="return confirm('Удалить статью?');">
+                <button class="btn btn-danger btn-sm" type="submit">Удалить</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

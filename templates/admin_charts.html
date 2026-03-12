@@ -1,0 +1,146 @@
+<!-- templates/admin_charts.html -->
+{% extends "base.html" %}
+{% block title %}Графики{% endblock %}
+{% block page_title %}Графики и аналитика{% endblock %}
+{% block content %}
+<style>
+    .charts-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        gap: 24px;
+        margin-top: 20px;
+    }
+    .chart-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .chart-title {
+        text-align: center;
+        margin-bottom: 15px;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    canvas {
+        max-width: 100%;
+    }
+</style>
+
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-title">Новые заявки за 7 дней</div>
+        <canvas id="ticketsByDayChart"></canvas>
+    </div>
+    <div class="chart-card">
+        <div class="chart-title">Статусы заявок</div>
+        <canvas id="statusPieChart"></canvas>
+    </div>
+    <div class="chart-card">
+        <div class="chart-title">Соблюдение SLA</div>
+        <canvas id="slaComplianceChart"></canvas>
+    </div>
+    <div class="chart-card">
+        <div class="chart-title">Заявки по отделам</div>
+        <canvas id="departmentBarChart"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    fetch('/api/charts/data')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки данных');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // 1. Заявки по дням
+            new Chart(document.getElementById('ticketsByDayChart'), {
+                type: 'line',
+                data: {
+                    labels: data.tickets_by_day.labels,
+                    datasets: [{
+                        label: 'Новые заявки',
+                        data: data.tickets_by_day.data,
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0,123,255,0.1)',
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // 2. Статусы (пирог)
+            new Chart(document.getElementById('statusPieChart'), {
+                type: 'pie',
+                data: {
+                    labels: data.status_pie.labels,
+                    datasets: [{
+                        data: data.status_pie.data,
+                        backgroundColor: ['#007bff', '#ffc107', '#fd7e14', '#28a745']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            // 3. SLA
+            new Chart(document.getElementById('slaComplianceChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Вовремя', 'Просрочено'],
+                    datasets: [{
+                        data: [data.sla_compliance.on_time_percent, data.sla_compliance.overdue_percent],
+                        backgroundColor: ['#28a745', '#dc3545']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            // 4. По отделам
+            new Chart(document.getElementById('departmentBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.department_bar.labels,
+                    datasets: [{
+                        label: 'Заявок',
+                        data: data.department_bar.data,
+                        backgroundColor: '#17a2b8'
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    scales: {
+                        x: { beginAtZero: true, ticks: { precision: 0 } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            alert('Не удалось загрузить графики: ' + error.message);
+        });
+});
+</script>
+{% endblock %}

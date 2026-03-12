@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block page_title %}Причины закрытия{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h4 mb-0">Причины закрытия (подстатусы для «Завершена»)</h2>
+    <a class="btn btn-primary btn-sm" href="{{ url_for('admin_close_reason_new') }}">
+      <i class="bi bi-plus-circle"></i> Добавить
+    </a>
+  </div>
+
+  <div class="alert alert-info">
+    <div class="fw-semibold">Как используется</div>
+    <div class="small text-muted">
+      В списках заявок показываются только состояния: <strong>Новая</strong>, <strong>В работе</strong>, <strong>Ожидание</strong>, <strong>Завершена</strong>.
+      Здесь настраиваются причины закрытия, которые отображаются внутри заявки.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Порядок</th>
+            <th>Название</th>
+            <th>Code</th>
+            <th>Активна</th>
+            <th>Требует комментарий</th>
+            <th class="text-end">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reasons %}
+            <tr>
+              <td>{{ r.sort_order }}</td>
+              <td>{{ r.name }}</td>
+              <td><code>{{ r.code }}</code></td>
+              <td>
+                {% if r.is_active %}
+                  <span class="badge bg-success">Да</span>
+                {% else %}
+                  <span class="badge bg-secondary">Нет</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.require_comment %}
+                  <span class="badge bg-warning text-dark">Да</span>
+                {% else %}
+                  <span class="text-muted">Нет</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_close_reason_edit', reason_id=r.id) }}">Редактировать</a>
+                <form method="POST" action="{{ url_for('admin_close_reason_delete', reason_id=r.id) }}" class="d-inline">
+                  <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Выключить причину?')">Выключить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">Нет записей</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Панель управления{% endblock %}
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<style>
+.dashboard-grid{display:grid;gap:18px}
+.dashboard-hero{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,.9fr);gap:18px}
+.dashboard-card{background:var(--surface,#fff);border:1px solid var(--border,#e5e7eb);border-radius:16px;box-shadow:var(--shadow-sm,0 10px 26px rgba(15,23,42,.05))}
+.dashboard-card__head{padding:18px 20px 0}.dashboard-card__body{padding:18px 20px 20px}
+.dashboard-card__title{margin:0;font-size:1.05rem;font-weight:800}.dashboard-card__sub{margin:6px 0 0;color:var(--muted,#6b7280);line-height:1.5}
+.dashboard-hero__title{margin:0;font-size:1.55rem;font-weight:800;line-height:1.2}.dashboard-hero__sub{margin:10px 0 0;color:var(--muted,#6b7280);line-height:1.6;max-width:72ch}
+.dashboard-hero__meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.dashboard-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid var(--border,#e5e7eb);background:var(--surface-2,var(--bg));font-size:.92rem}
+.dashboard-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.metric-card{padding:16px;border:1px solid var(--border,#e5e7eb);border-radius:14px;background:var(--surface-2,var(--bg))}
+.metric-label{font-size:.84rem;font-weight:700;color:var(--muted,#6b7280);text-transform:uppercase;letter-spacing:.03em}.metric-value{margin-top:8px;font-size:1.9rem;font-weight:800;line-height:1.1}.metric-sub{margin-top:6px;color:var(--muted,#6b7280);font-size:.92rem;line-height:1.45}
+.dashboard-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.dashboard-link{display:block;padding:16px;border:1px solid var(--border,#e5e7eb);border-radius:14px;text-decoration:none;color:var(--text,#111827);background:var(--surface-2,var(--bg));transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+.dashboard-link:hover{border-color:color-mix(in oklab, var(--accent,#2563eb) 34%, var(--border,#e5e7eb));transform:translateY(-1px);box-shadow:var(--shadow-sm,0 10px 26px rgba(15,23,42,.05))}
+.dashboard-link__title{font-weight:800;margin:0 0 4px}.dashboard-link__desc{margin:0;color:var(--muted,#6b7280);font-size:.95rem;line-height:1.45}
+.dashboard-empty{padding:16px;border:1px dashed var(--border,#cbd5e1);border-radius:12px;color:var(--muted,#6b7280);background:var(--surface-2,var(--bg))}
+.dashboard-table{width:100%;border-collapse:collapse}.dashboard-table th,.dashboard-table td{padding:12px 10px;border-bottom:1px solid var(--border,#e5e7eb);vertical-align:top}.dashboard-table th{font-size:.84rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted,#6b7280);text-align:left}.dashboard-table tr:last-child td{border-bottom:none}
+@media (max-width: 1200px){.dashboard-hero{grid-template-columns:1fr}}@media (max-width: 720px){.dashboard-kpis{grid-template-columns:1fr}.dashboard-hero__title{font-size:1.35rem}}
+</style>
+<div class="dashboard-grid">
+  <section class="dashboard-hero">
+    <div class="dashboard-card"><div class="dashboard-card__body"><h1 class="dashboard-hero__title">Панель управления</h1><p class="dashboard-hero__sub">Главная рабочая страница оператора и администратора. Здесь собраны быстрые переходы, текущая загрузка и новые заявки, которые требуют внимания в первую очередь.</p><div class="dashboard-hero__meta"><span class="dashboard-chip">Поддержка: {{ operators_count }}</span><span class="dashboard-chip">Новых заявок: {{ new_tickets|length }}</span><span class="dashboard-chip">Всего в системе: {{ total_tickets }}</span></div></div></div>
+    <div class="dashboard-card"><div class="dashboard-card__body"><div class="dashboard-kpis"><div class="metric-card"><div class="metric-label">Новые заявки</div><div class="metric-value">{{ new_tickets|length }}</div><div class="metric-sub">Ожидают первой обработки</div></div><div class="metric-card"><div class="metric-label">Всего заявок</div><div class="metric-value">{{ total_tickets }}</div><div class="metric-sub">Во всей системе</div></div><div class="metric-card"><div class="metric-label">Завершено</div><div class="metric-value">{{ resolved_count }}</div><div class="metric-sub">Закрытые заявки</div></div><div class="metric-card"><div class="metric-label">Сотрудники поддержки</div><div class="metric-value">{{ operators_count }}</div><div class="metric-sub">Администраторы и операторы</div></div></div></div></div>
+  </section>
+
+  <section class="dashboard-card">
+    <div class="dashboard-card__head"><h2 class="dashboard-card__title">Быстрый доступ</h2><p class="dashboard-card__sub">Ссылки сгруппированы по рабочим сценариям без дублей и лишних блоков.</p></div>
+    <div class="dashboard-card__body"><div class="dashboard-links">
+      <a class="dashboard-link" href="{{ url_for('user_profile') }}"><div class="dashboard-link__title">Профиль</div><p class="dashboard-link__desc">Личные данные, контакты и настройки учётной записи.</p></a>
+      {% if current_user.role == 'admin' %}<a class="dashboard-link" href="{{ url_for('admin_users') }}"><div class="dashboard-link__title">Пользователи</div><p class="dashboard-link__desc">Управление ролями, доступами и карточками сотрудников.</p></a><a class="dashboard-link" href="{{ url_for('admin_organizations') }}"><div class="dashboard-link__title">Организации</div><p class="dashboard-link__desc">Список компаний клиентов и переход в карточки по ИНН.</p></a><a class="dashboard-link" href="{{ url_for('admin_statistics') }}"><div class="dashboard-link__title">Статистика</div><p class="dashboard-link__desc">Показатели по SLA, загрузке и обработке заявок.</p></a><a class="dashboard-link" href="{{ url_for('admin_reports') }}"><div class="dashboard-link__title">Отчёты</div><p class="dashboard-link__desc">Сводные данные по инцидентам, клиентам и причинам обращений.</p></a><a class="dashboard-link" href="{{ url_for('admin_automation_index') }}"><div class="dashboard-link__title">Автоматизация</div><p class="dashboard-link__desc">Правила автоназначения, эскалаций и служебных заметок.</p></a>{% endif %}
+    </div></div>
+  </section>
+
+  <section class="dashboard-card">
+    <div class="dashboard-card__head"><h2 class="dashboard-card__title">Новые заявки</h2><p class="dashboard-card__sub">Последние обращения, которые требуют внимания в первую очередь. Внизу выводятся не более 10 заявок.</p></div>
+    <div class="dashboard-card__body">
+      {% if new_tickets %}
+      <div style="overflow:auto"><table class="dashboard-table"><thead><tr><th>ID</th><th>Тема</th><th>Клиент</th><th>Создана</th><th>Приоритет</th></tr></thead><tbody>
+        {% for ticket in new_tickets[:10] %}
+        <tr>
+          <td><a href="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">{{ ticket.id|ticket_id }}</a></td>
+          <td><a href="{{ url_for('ticket_detail', ticket_id=ticket.id) }}"><strong>{{ ticket.subject|truncate(90) }}</strong></a></td>
+          <td>{{ ticket.client_rel.name if ticket.client_rel else (ticket.name or 'Клиент не указан') }}</td>
+          <td>{{ ticket.created_at.strftime('%d.%m.%Y %H:%M') if ticket.created_at else 'Дата не указана' }}</td>
+          <td><span class="badge-status">{{ ticket.priority or 'Без приоритета' }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody></table></div>
+      {% else %}<div class="dashboard-empty">Новых заявок сейчас нет.</div>{% endif %}
+    </div>
+  </section>
+</div>
+</section>
+</div>
+{% endblock %}

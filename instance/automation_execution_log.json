@@ -1,0 +1,26 @@
+[
+  {
+    "created_at": "2026-03-10T02:18:17Z",
+    "source": "preview",
+    "ticket_id": 15,
+    "ticket_subject": "Заявка на перезаключение договора",
+    "matched_rules": [],
+    "execution_log": [
+      {
+        "rule_key": "vip-high-priority",
+        "matched": false,
+        "applied_actions": [],
+        "notes": [
+          "disabled"
+        ]
+      },
+      {
+        "rule_key": "sla-breach-note",
+        "matched": false,
+        "applied_actions": [],
+        "notes": []
+      }
+    ],
+    "mutations": {
+      "priority": "normal",
+      "department": 

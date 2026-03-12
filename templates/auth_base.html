@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="{{ session.get('ui_theme','light') }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Техподдержка АО Центр ИКТ{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/hd.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tickets.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-light text-dark">
+
+  <div class="hd-toasts" id="hdToasts" aria-live="polite" aria-atomic="true"></div>
+
+  <main class="main-content">
+    <div class="page-container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% set category, message = messages[0] %}
+          <div id="hd-flash" class="hd-flash hd-flash-{{ category|e }}">
+            <span class="hd-flash-text">{{ message }}</span>
+            <button type="button" class="hd-flash-close" aria-label="Закрыть" onclick="document.getElementById('hd-flash').remove()">×</button>
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  {% block scripts %}{% endblock %}
+  <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+  <script>
+  // Flash: авто-скрываем
+  (function(){
+    const el = document.getElementById('hd-flash');
+    if(!el) return;
+    setTimeout(() => {
+      if(el && el.parentNode) el.remove();
+    }, 6000);
+  })();
+  </script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

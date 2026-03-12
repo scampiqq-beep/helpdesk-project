@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% from 'partials/svg.html' import svg %}
+
+{% block title %}База знаний{% endblock %}
+
+{% block extra_css %}
+<style>
+.kb-page-head .page-title{font-size:1.38rem;line-height:1.05}
+.kb-page-head .muted{font-size:.82rem}
+.kb-search-card.card{margin-top:8px}
+.kb-search-card .card-body{padding:10px 12px}
+.kb-search-form .input{min-height:34px;font-size:.88rem}
+.kb-grid{display:grid !important;grid-template-columns:220px 1fr !important;gap:8px !important;margin-top:8px !important}
+.kb-grid .card-header{padding:8px 10px;font-size:.86rem}
+.kb-grid .card-body{padding:8px 10px}
+.kb-item{padding:3px 0;border-bottom:1px solid rgba(148,163,184,.10)}
+.kb-item:last-child{border-bottom:0;padding-bottom:0}
+.kb-item a{font-size:.88rem;line-height:1.22}
+.kb-item .muted{font-size:.74rem;margin-top:1px !important}
+.kb-fav-btn.btn{min-height:28px;padding:3px 7px}
+@media (max-width: 960px){.kb-grid{grid-template-columns:1fr !important}}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head kb-page-head" style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap;">
+  <div>
+    <h1 class="page-title" style="margin:0;">База знаний</h1>
+    <div class="muted" style="margin-top:4px;">Краткое описание — это шаблон для вставки в комментарий. Полная статья — расширенная инструкция.</div>
+  </div>
+
+  <div class="d-flex gap-2" style="flex-wrap:wrap;">
+    <a class="btn btn-secondary btn-sm" href="{{ url_for('kb_favorites') }}">★ Избранное</a>
+    {% if is_admin %}
+      <a class="btn btn-primary btn-sm" href="{{ url_for('kb_manage') }}">{{ svg('settings') }}Управление</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card kb-search-card" style="margin-top:8px;">
+  <div class="card-body">
+    <form method="get" action="{{ url_for('knowledge') }}" class="d-flex gap-2 kb-search-form" style="flex-wrap:wrap; align-items:center;">
+      <input class="input" type="text" name="q" value="{{ q }}" placeholder="Поиск по статьям (название, теги, текст)…" style="min-width:min(460px, 100%);">
+      {% if only_fav %}<input type="hidden" name="fav" value="1">{% endif %}
+      <button class="btn btn-primary" type="submit">Найти</button>
+      {% if q or only_fav %}
+        <a class="btn btn-ghost" href="{{ url_for('knowledge') }}">Сбросить</a>
+      {% endif %}
+      <label class="d-flex gap-2" style="align-items:center; margin-left:auto;">
+        <input type="checkbox" {% if only_fav %}checked{% endif %} onchange="location.href='{{ url_for('knowledge') }}?fav='+(this.checked?1:0)+'&q={{ q|urlencode }}'">
+        <span>Только избранное</span>
+      </label>
+    </form>
+  </div>
+</div>
+
+{% if categories|length == 0 %}
+  <div class="notice muted" style="margin-top:14px;">Пока нет категорий. {% if is_admin %}Добавьте их в разделе «Управление».{% endif %}</div>
+{% endif %}
+
+<div class="kb-grid" style="display:grid; grid-template-columns: 240px 1fr; gap:8px; margin-top:8px;">
+  <aside class="card">
+    <div class="card-header">Категории</div>
+    <div class="card-body" style="display:flex; flex-direction:column; gap:6px;">
+      {% for c in categories %}
+        <a class="nav-link" href="#cat-{{ c.id }}" style="padding:5px 7px; border-radius:8px; background:rgba(17,24,39,.04);">{{ c.title }}</a>
+      {% endfor %}
+      {% if categories|length == 0 %}
+        <div class="muted">—</div>
+      {% endif %}
+    </div>
+  </aside>
+
+  <section style="display:flex; flex-direction:column; gap:10px;">
+    {% for c in categories %}
+      <div class="card" id="cat-{{ c.id }}">
+        <div class="card-header d-flex" style="justify-content:space-between; align-items:center;">
+          <div class="d-flex" style="align-items:center; gap:8px;">{{ svg('book') }}<span>{{ c.title }}</span></div>
+          <span class="muted">{{ (by_cat.get(c.id) or [])|length }} статей</span>
+        </div>
+        <div class="card-body" style="display:flex; flex-direction:column; gap:6px;">
+          {% set arts = by_cat.get(c.id) or [] %}
+          {% if arts|length == 0 %}
+            <div class="muted">В этой категории пока нет статей.</div>
+          {% else %}
+            {% for a in arts %}
+              <div class="kb-item" style="display:flex; gap:8px; align-items:flex-start; justify-content:space-between;">
+                <div style="min-width:0;">
+                  <a href="{{ url_for('kb_article', article_id=a.id) }}" style="font-weight:700; text-decoration:none;">{{ a.title }}</a>
+                  <div class="muted" style="margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ (a.tags or '') }}</div>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm kb-fav-btn" data-article-id="{{ a.id }}" title="В избранное">
+                  <span class="kb-star" aria-hidden="true">{% if a.id in fav_ids %}★{% else %}☆{% endif %}</span>
+                </button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+
+    {# статьи без категории #}
+    {% set unc = by_cat.get(0) or [] %}
+    {% if unc|length > 0 %}
+      <div class="card" id="cat-0">
+        <div class="card-header d-flex" style="justify-content:space-between; align-items:center;">
+          <div class="d-flex" style="align-items:center; gap:8px;">{{ svg('book') }}<span>Без категории</span></div>
+          <span class="muted">{{ unc|length }} статей</span>
+        </div>
+        <div class="card-body" style="display:flex; flex-direction:column; gap:6px;">
+          {% for a in unc %}
+            <div class="kb-item" style="display:flex; gap:8px; align-items:flex-start; justify-content:space-between;">
+              <div style="min-width:0;">
+                <a href="{{ url_for('kb_article', article_id=a.id) }}" style="font-weight:700; text-decoration:none;">{{ a.title }}</a>
+                <div class="muted" style="margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ (a.tags or '') }}</div>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm kb-fav-btn" data-article-id="{{ a.id }}" title="В избранное">
+                <span class="kb-star" aria-hidden="true">{% if a.id in fav_ids %}★{% else %}☆{% endif %}</span>
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  async function toggleFav(articleId, btn){
+    try{
+      const res = await fetch(`/api/kb/favorite/${articleId}`, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}});
+      const data = await res.json();
+      if(!data || !data.success) return;
+      const star = btn.querySelector('.kb-star');
+      if(star) star.textContent = data.is_favorite ? '★' : '☆';
+    }catch(e){}
+  }
+
+  document.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.kb-fav-btn');
+    if(!btn) return;
+    e.preventDefault();
+    const id = btn.dataset.articleId;
+    if(!id) return;
+    toggleFav(id, btn);
+  });
+})();
+</script>
+{% endblock %}

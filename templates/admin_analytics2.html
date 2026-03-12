@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}Статистика и отчёты{% endblock %}
+{% block page_title %}Статистика и отчёты{% endblock %}
+
+{% block content %}
+<style>
+  .an-wrap{ width:100%; }
+  .an-filters{ background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+  .an-row{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .an-field{ display:flex; flex-direction:column; gap:4px; min-width:180px; }
+  .an-field label{ font-size:12px; color:#6b7280; }
+  .an-field select,.an-field input{ padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
+  .an-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .an-actions a{ text-decoration:none; }
+
+  .kpi{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:14px; }
+  .kpi-card{ background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+  .kpi-title{ font-size:12px; color:#6b7280; margin-bottom:6px; }
+  .kpi-value{ font-size:22px; font-weight:800; color:#111827; }
+  .kpi-sub{ font-size:12px; color:#6b7280; margin-top:6px; }
+
+  .an-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(520px,1fr)); gap:16px; margin-top:16px; }
+  .card{ background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+  .card-h{ padding:10px 14px; border-bottom:1px solid #eef2f7; font-weight:700; color:#111827; }
+  .card-b{ padding:12px 14px; }
+
+  .mini-table{ width:100%; border-collapse:collapse; }
+  .mini-table th,.mini-table td{ padding:8px 10px; border-bottom:1px solid #eef2f7; font-size:14px; }
+  .mini-table th{ text-align:left; font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:.02em; }
+  .mini-table td:last-child,.mini-table th:last-child{ text-align:right; }
+
+  .report-wrap{ margin-top:16px; }
+  .report-tools{ display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+  .badge{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #e5e7eb; background:#f9fafb; }
+  .badge.ok{ background:#ecfdf5; border-color:#a7f3d0; }
+  .badge.warn{ background:#fffbeb; border-color:#fde68a; }
+  .badge.danger{ background:#fef2f2; border-color:#fecaca; }
+</style>
+
+<div class="an-wrap">
+
+  <div class="an-filters">
+    <form method="get">
+      <div class="an-row">
+        <div class="an-field">
+          <label>Период</label>
+          <select name="period" onchange="this.form.submit()">
+            <option value="7"  {% if period == '7' %}selected{% endif %}>7 дней</option>
+            <option value="30" {% if period == '30' %}selected{% endif %}>30 дней</option>
+            <option value="90" {% if period == '90' %}selected{% endif %}>90 дней</option>
+            <option value="365" {% if period == '365' %}selected{% endif %}>365 дней</option>
+            <option value="custom" {% if period == 'custom' %}selected{% endif %}>Свой период</option>
+          </select>
+        </div>
+
+        <div class="an-field">
+          <label>Отдел</label>
+          <select name="department_id" onchange="this.form.submit()">
+            <option value="">Все отделы</option>
+            {% for d in all_departments %}
+              <option value="{{ d.id }}" {% if department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="an-field">
+          <label>Оператор (по взятым)</label>
+          <select name="operator_id" onchange="this.form.submit()">
+            <option value="">Все</option>
+            {% for op in operators %}
+              <option value="{{ op.id }}" {% if operator_id == op.id %}selected{% endif %}>{{ op.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="an-field">
+          <label>С</label>
+          <input type="date" name="date_from" value="{{ date_from }}" {% if period != 'custom' %}disabled{% endif %}>
+        </div>
+        <div class="an-field">
+          <label>По</label>
+          <input type="date" name="date_to" value="{{ date_to }}" {% if period != 'custom' %}disabled{% endif %}>
+        </div>
+
+        <div class="an-field" style="min-width:140px;">
+          <button class="btn btn-primary" type="submit" style="padding:9px 12px; border-radius:8px;">Применить</button>
+        </div>
+      </div>
+
+      <div class="an-actions">
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_stats') }}">Статистика (старая)</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_reports') }}">Отчёты</a>
+        <a class="btn btn-success btn-sm" href="{{ url_for('admin_reports_export_xlsx', period=period, department_id=department_id, operator_id=operator_id, date_from=date_from, date_to=date_to) }}">Выгрузить Excel</a>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('admin_stats') }}">Графики</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="kpi">
+    <div class="kpi-card">
+      <div class="kpi-title">Создано за период</div>
+      <div class="kpi-value">{{ total }}</div>
+      <div class="kpi-sub">Период: <strong>{{ period_label }}</strong> · Новые сегодня: <strong>{{ new_today }}</strong></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Открыто сейчас</div>
+      <div class="kpi-value">{{ in_progress }}</div>
+      <div class="kpi-sub">Очередь на конец периода: <strong>{{ new_count }}</strong></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Завершено</div>
+      <div class="kpi-value">{{ resolved }}</div>
+      <div class="kpi-sub">SLA (закрытые): <strong>{{ sla_compliance_percent }}%</strong> · Net flow: <strong>{{ sla_metrics.net_flow }}</strong></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Просрочено (активные)</div>
+      <div class="kpi-value">{{ overdue_active }}</div>
+      <div class="kpi-sub">MTTR: <strong>{{ sla_metrics.avg_time_to_resolve }}</strong> · FRT: <strong>{{ sla_metrics.frt_avg }}</strong></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Удовлетворённость</div>
+      <div class="kpi-value">{{ satisfaction }}%</div>
+      <div class="kpi-sub">👍 {{ helpful_pos }} · 👎 {{ helpful_neg }} · всего оценок: {{ helpful_total }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">СПАМ (помечено)</div>
+      <div class="kpi-value">{{ spam_count }}</div>
+      <div class="kpi-sub">(в выбранном периоде/фильтре)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">База знаний</div>
+      <div class="kpi-value">{{ kb_published }}/{{ kb_total }}</div>
+      <div class="kpi-sub">избранное: <strong>{{ kb_favs }}</strong></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-title">SLA детали</div>
+      <div class="kpi-value">{{ sla_metrics.on_time }}<span class="kpi-sub"> в срок</span></div>
+      <div class="kpi-sub">просрочено: <strong>{{ sla_metrics.overdue_completed }}</strong></div>
+    </div>
+  </div>
+
+  <div class="an-grid">
+    <div class="card">
+      <div class="card-h">Статусы</div>
+      <div class="card-b"><canvas id="statusChart" height="150"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Приоритеты</div>
+      <div class="card-b"><canvas id="priorityChart" height="150"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Категории</div>
+      <div class="card-b"><canvas id="categoryChart" height="170"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Нагрузка по операторам</div>
+      <div class="card-b">
+        <canvas id="operatorChart" height="170"></canvas>
+        <div style="margin-top:10px; overflow:auto; max-height:240px;">
+          <table class="mini-table">
+            <thead><tr><th>Оператор</th><th>Заявок</th></tr></thead>
+            <tbody>
+              {% for r in operator_rows %}
+                <tr><td>{{ r.username }}</td><td><strong>{{ r.count }}</strong></td></tr>
+              {% endfor %}
+              {% if operator_rows|length == 0 %}
+                <tr><td colspan="2" style="color:#6b7280;">Нет данных</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="report-wrap card">
+    <div class="card-h">Отчёт: последние заявки (до 200 строк)</div>
+    <div class="card-b">
+      <div class="report-tools">
+        <span class="badge">Период: {{ period }}</span>
+        {% if department_id %}
+          <span class="badge">Отдел: {{ all_departments|selectattr('id','equalto',department_id)|map(attribute='name')|list|first }}</span>
+        {% endif %}
+        {% if operator_id %}
+          <span class="badge">Оператор: {{ operators|selectattr('id','equalto',operator_id)|map(attribute='username')|list|first }}</span>
+        {% endif %}
+      </div>
+
+      <div class="table-responsive" style="overflow:auto;">
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th style="width:80px;">ID</th>
+              <th>Тема</th>
+              <th>Отдел</th>
+              <th>Статус</th>
+              <th>Приоритет</th>
+              <th>Оператор</th>
+              <th style="width:160px;">Создана</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in report_rows %}
+              <tr>
+                <td><a href="{{ url_for('ticket_detail', ticket_id=t.id) }}">#{{ t.id }}</a></td>
+                <td>{{ t.subject }}</td>
+                <td>{{ (t.department_rel.name if t.department_rel else '—') }}</td>
+                <td>
+                  {% if t.status == 'Завершена' %}
+                    <span class="badge ok">{{ t.status }}</span>
+                  {% elif t.status == 'Новая' %}
+                    <span class="badge warn">{{ t.status }}</span>
+                  {% else %}
+                    <span class="badge">{{ t.status }}</span>
+                  {% endif %}
+                  {% if t.is_spam %}
+                    <span class="badge danger">СПАМ</span>
+                  {% endif %}
+                </td>
+                <td>{{ t.priority }}</td>
+                <td>{{ t.locked_by_rel.username if t.locked_by_rel else '—' }}</td>
+                <td>{{ t.created_at.strftime('%d.%m.%Y %H:%M') if t.created_at else '—' }}</td>
+              </tr>
+            {% endfor %}
+            {% if report_rows|length == 0 %}
+              <tr><td colspan="7" style="color:#6b7280;">Нет данных</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const statusLabels = {{ status_counts.keys()|list|tojson }};
+  const statusData = {{ status_counts.values()|list|tojson }};
+
+  const priorityLabels = {{ priority_counts.keys()|list|tojson }};
+  const priorityData = {{ priority_counts.values()|list|tojson }};
+
+  const categoryLabels = {{ category_counts.keys()|list|tojson }};
+  const categoryData = {{ category_counts.values()|list|tojson }};
+
+  const operatorLabels = {{ operator_rows|map(attribute='username')|list|tojson }};
+  const operatorData = {{ operator_rows|map(attribute='count')|list|tojson }};
+
+  function makeChart(id, labels, data, type){
+    const ctx = document.getElementById(id);
+    if(!ctx) return;
+    new Chart(ctx, {
+      type: type,
+      data: {
+        labels,
+        datasets: [{ label: '', data }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: (type === 'pie' || type === 'doughnut') ? {} : { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  makeChart('statusChart', statusLabels, statusData, 'doughnut');
+  makeChart('priorityChart', priorityLabels, priorityData, 'bar');
+  makeChart('categoryChart', categoryLabels, categoryData, 'bar');
+  makeChart('operatorChart', operatorLabels, operatorData, 'bar');
+</script>
+{% endblock %}

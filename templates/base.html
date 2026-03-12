@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="{{ (current_user.ui_theme if (current_user.is_authenticated and current_user.ui_theme) else session.get('ui_theme','light')) }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Техподдержка АО Центр ИКТ{% endblock %}</title>
+    {# Полностью свой UI без Bootstrap #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/hd.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tickets.css') }}">
+
+    <!-- Иконки (локальные SVG) -->
+    {# Убрали внешние CDN (bootstrap-icons / font-awesome). Используем локальный SVG sprite. #}
+
+    {# inline CSS удалён: весь дизайн в hd.css #}
+    <!-- Fancybox -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@4.0/dist/fancybox.css" />
+    {# custom.css удалён: всё в hd.css #}
+    {% block extra_css %}
+    {% endblock %}
+</head>
+<body class="bg-light text-dark">
+    
+    
+    <!-- Топ-бар: своё flex-меню без bootstrap-классов -->
+    {% from 'partials/svg.html' import svg %}
+    <nav class="top-navbar">
+      <!-- Весь блок меню должен иметь ту же фиксированную ширину, что и таблицы/контент -->
+      <div class="topbar-surface">
+      <div class="topbar-inner">
+        <div class="topbar-left">
+        {# Кнопка-бургер убрана по требованиям: меню всегда видно #}
+        <!-- Логотип и название слева -->
+        <a href="{{ url_for('ticket_list') }}" class="navbar-brand-wrapper">
+          <div class="navbar-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Логотип">
+          </div>
+          <div>
+            <span class="navbar-title">Техподдержка АО Центр ИКТ</span>
+            <span class="navbar-subtitle">Республики Башкортостан</span>
+          </div>
+        </a>
+
+        <!-- Меню слева -->
+        <div class="topbar-menu" id="topbarMenu">
+          {% if current_user.is_authenticated and current_user.is_operator() %}
+            <a href="{{ url_for('ticket_list') }}" class="nav-link {{ 'active' if request.endpoint == 'ticket_list' else '' }}">{{ svg('inbox') }}Заявки</a>
+
+            {# Канбан доступен только: админ + операторы ТП 1/2 линии #}
+            {% if current_user.role == 'admin' or is_tp_operator(current_user) %}
+              <a href="{{ url_for('kanban') }}" class="nav-link {{ 'active' if request.endpoint in ['kanban','admin_kanban'] else '' }}">{{ svg('kanban') }}Канбан</a>
+            {% endif %}
+
+
+            {% if current_user.role == 'admin' or is_tp_operator(current_user) %}
+              <a href="{{ url_for('admin_dashboard') }}" class="nav-link {{ 'active' if (request.endpoint and request.endpoint.startswith('admin')) else '' }}">{{ svg('settings') }}Панель управления</a>
+            {% endif %}
+            <a href="{{ url_for('knowledge') }}" class="nav-link {{ 'active' if request.endpoint in ['knowledge','user_knowledge_base'] else '' }}">{{ svg('book') }}База знаний</a>
+          {% elif current_user.is_authenticated %}
+            <a href="{{ url_for('ticket_list') }}" class="nav-link {{ 'active' if request.endpoint == 'ticket_list' else '' }}">{{ svg('inbox') }}Заявки</a>
+            <a href="{{ url_for('knowledge') }}" class="nav-link {{ 'active' if request.endpoint in ['knowledge','user_knowledge_base'] else '' }}">{{ svg('book') }}База знаний</a>
+          {% else %}
+            <a href="{{ url_for('ticket_list') }}" class="nav-link {{ 'active' if request.endpoint == 'ticket_list' else '' }}">{{ svg('inbox') }}Заявки</a>
+            <a href="{{ url_for('knowledge') }}" class="nav-link {{ 'active' if request.endpoint in ['knowledge','user_knowledge_base'] else '' }}">{{ svg('book') }}База знаний</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Справа: профиль/выход или вход/регистрация -->
+      <div class="topbar-right">
+        {% if current_user.is_authenticated %}
+          <!-- Тема (light/dark) -->
+          <button type="button" class="icon-btn" id="themeToggle" title="Переключить тему" aria-label="Переключить тему">
+            <span class="theme-ico theme-ico-moon">{{ svg('moon') }}</span>
+            <span class="theme-ico theme-ico-sun">{{ svg('sun') }}</span>
+          </button>
+          <!-- Колокольчик уведомлений -->
+        <!-- Уведомления (колокольчик) -->
+        <div class="notif">
+          <button type="button" class="notif-btn" id="notifBtn" aria-haspopup="true" aria-expanded="false" title="Уведомления">
+            {{ svg('bell') }}
+            
+            <span class="notif-badge hidden" id="notifBadge"></span>
+
+          </button>
+          <div class="notif-dropdown" id="notifDropdown" hidden>
+            <div class="notif-head">
+              <span class="notif-title">Уведомления</span>
+              <form method="post" action="/notifications/mark-all-read" class="m-0">
+                <button type="submit" class="notif-action">Прочитать всё</button>
+              </form>
+            </div>
+            <div class="notif-list" id="notifList">
+              {% if nav_notifications %}
+                {% for n in nav_notifications %}
+                  <a class="notif-item {% if not n.is_read %}unread{% endif %}" href="/n/{{ n.id }}">
+                    <div class="notif-text">{{ n.title }}</div>
+                    {% if n.created_at %}<div class="notif-time">{{ n.created_at.strftime("%d.%m.%Y %H:%M") }}</div>{% endif %}
+                  </a>
+                {% endfor %}
+              {% else %}
+                <div class="notif-empty">Нет уведомлений</div>
+              {% endif %}
+            </div>
+            <div class="notif-foot"><a class="notif-all" href="/notifications">Все уведомления</a></div>
+          </div>
+        </div>
+          {% set ln = (current_user.last_name or '').strip() %}
+          {% set fn = (current_user.name or '').strip() %}
+          {% set pn = (current_user.patronymic or '').strip() %}
+          {% set initials = (fn[:1] ~ '.' if fn else '') ~ (pn[:1] ~ '.' if pn else '') %}
+          <div class="topbar-user" id="userMenu">
+            <button type="button" class="nav-link user-btn" id="userBtn" aria-haspopup="true" aria-expanded="false">
+              {{ svg('user') }}{{ (ln ~ ' ' ~ initials).strip() if (ln or initials) else (current_user.username or current_user.email) }}
+              <span class="caret">▾</span>
+            </button>
+            <div class="user-dd" id="userDropdown" hidden>
+              <a class="user-dd-item" href="{{ url_for('user_profile') }}">{{ svg('settings') }}Профиль</a>
+              <a class="user-dd-item" href="{{ url_for('logout') }}">{{ svg('logout') }}Выход</a>
+            </div>
+          </div>
+        {% else %}
+          <a href="{{ url_for('login') }}" class="nav-link {{ 'active' if request.endpoint == 'login' else '' }}">{{ svg('login') }}Вход</a>
+          <a href="{{ url_for('register') }}" class="nav-link {{ 'active' if request.endpoint == 'register' else '' }}">{{ svg('edit') }}Регистрация</a>
+        {% endif %}
+      </div>
+    </div>
+    </div>
+    </nav>
+
+    <div class="hd-toasts" id="hdToasts" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Основной контент -->
+    <main class="main-content">
+        <div class="page-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% set category, message = messages[0] %}
+            <div id="hd-flash" class="hd-flash hd-flash-{{ category|e }}">
+              <span class="hd-flash-text">{{ message }}</span>
+              <button type="button" class="hd-flash-close" aria-label="Закрыть" onclick="document.getElementById('hd-flash').remove()">×</button>
+            </div>
+          {% endif %}
+        {% endwith %}
+
+
+        {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Футер -->
+    <footer class="footer">
+        <div class="footer-inner">
+          <div class="footer-meta">© 2026 АО Центр ИКТ РБ · Версия 0.1.14</div>
+          <div class="footer-clock" id="footerClock" aria-label="Текущее время"></div>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    {# Socket.IO client. На некоторых окружениях встроенная раздача /socket.io/socket.io.js может давать 400,
+       поэтому используем CDN (стабильнее). #}
+    <script src="{{ url_for('static', filename='js/live_notifications.js') }}"></script>
+
+    <script>
+// Часы в футере: показываем СИСТЕМНОЕ время (сервер), а не время компьютера пользователя
+(function(){
+  const el = document.getElementById('footerClock');
+  if(!el) return;
+  async function tick(){
+    try{
+      const r = await fetch('/api/system_time', { cache: 'no-store' });
+      const data = await r.json();
+      el.textContent = 'Время (система): ' + (data.display || '');
+    }catch(e){
+      // fallback: не шумим
+      el.textContent = '';
+    }
+  }
+  tick();
+  setInterval(tick, 1000 * 30);
+})();
+    </script>
+    
+    <script>
+// Flash: показываем 1 сообщение сверху по центру и авто-скрываем
+(function(){
+  const el = document.getElementById('hd-flash');
+  if(!el) return;
+  setTimeout(()=>{ try{ el.remove(); }catch(e){} }, 4500);
+})();
+</script>
+
+    
+    {% block extra_js %}
+    <script>
+    function initMultiselects() {
+        document.querySelectorAll('.multiselect-trigger').forEach(trigger => {
+            const dropdownId = trigger.dataset.target;
+            const dropdown = document.getElementById(dropdownId);
+            if (!dropdown) return;
+
+            trigger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                dropdown.classList.toggle('open');
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.multiselect-wrapper')) {
+                    dropdown.classList.remove('open');
+                }
+            });
+
+            const checkboxes = dropdown.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const checked = Array.from(checkboxes).filter(el => el.checked);
+                    const fieldName = cb.name;
+                    const selectedText = trigger.querySelector('.selected-text');
+                    const selectedCount = trigger.querySelector('.selected-count');
+
+                    selectedCount.textContent = checked.length;
+
+                    if (checked.length === 0) {
+                        const ph = trigger.dataset.placeholder;
+                        if (ph) selectedText.textContent = ph;
+                        else selectedText.textContent = fieldName === 'department' ? 'Все отделы' : 'Все статусы';
+                    } else if (checked.length === 1) {
+                        selectedText.textContent = checked[0].closest('label').textContent.trim();
+                    } else {
+                        selectedText.textContent = `${checked.length} выбрано`;
+                    }
+
+                    // Для фильтров (GET) удобно прокидывать выбранные значения через hidden
+                    // В формах POST (например, админка) оставляем обычные checkbox'ы, чтобы сервер получил getlist().
+                    const form = trigger.closest('form');
+                    if (form && (form.getAttribute('method') || 'GET').toUpperCase() === 'GET') {
+                        form.querySelectorAll(`input[name="${fieldName}"][type="hidden"]`).forEach(el => el.remove());
+                        if (checked.length > 0) {
+                            const values = checked.map(el => el.value).join(',');
+                            const hiddenInput = document.createElement('input');
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.name = fieldName;
+                            hiddenInput.value = values;
+                            form.appendChild(hiddenInput);
+                        }
+                    }
+                });
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', initMultiselects);
+   </script>
+<script>
+(function() {
+  const endpoint = "{{ request.endpoint or '' }}";
+  const AUTO_REFRESH_ENDPOINTS = new Set([
+    "ticket_list",
+    "kanban",
+    "admin_dashboard",
+    "admin_support_list",
+    "admin_kanban",
+    "admin_reports",
+    "admin_stats",
+    "admin_analytics"
+  ]);
+
+  if (!AUTO_REFRESH_ENDPOINTS.has(endpoint)) return;
+
+  let dirty = false;
+  const markDirty = () => { dirty = true; };
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+    if (!t) return;
+    if (t.matches('input, textarea, select')) markDirty();
+  }, true);
+
+  const isUserBusy = () => {
+    const el = document.activeElement;
+    if (el && el.matches && el.matches('input, textarea, select')) return true;
+    if (document.querySelector('.modal.show')) return true;
+    if (dirty) return true;
+    return false;
+  };
+
+  setInterval(function() {
+    if (isUserBusy()) return;
+    location.reload();
+  }, 30000);
+})();
+</script>
+    {% endblock %}
+
+<script>
+(function(){
+  const btn = document.getElementById('notifBtn');
+  const dd = document.getElementById('notifDropdown');
+  function close(){ if(dd){ dd.hidden = true; btn && btn.setAttribute('aria-expanded','false'); } }
+  function toggle(){
+    if(!dd) return;
+    const open = dd.hidden === false;
+    dd.hidden = open;
+    btn && btn.setAttribute('aria-expanded', String(!open));
+  }
+  if(btn && dd){
+    btn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); });
+    document.addEventListener('click', ()=>close());
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') close(); });
+    dd.addEventListener('click', (e)=>{ e.stopPropagation(); });
+  }
+  const flash = document.getElementById('hd-flash');
+  if(flash){
+    setTimeout(()=>{ try{ flash.remove(); }catch(e){} }, 4500);
+  }
+})();
+</script>
+
+</body>
+</html>

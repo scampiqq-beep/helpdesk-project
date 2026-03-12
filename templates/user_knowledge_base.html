@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}База знаний{% endblock %}
+{% block page_title %}<i class="bi bi-journal-bookmark me-2"></i>База знаний{% endblock %}
+
+{% block content %}
+  {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    <div class="mb-4">
+      <a href="{{ url_for('add_faq') }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>Добавить статью
+      </a>
+    </div>
+  {% endif %}
+
+  {% if faqs and faqs|length > 0 %}
+    <div class="row g-3">
+      {% for faq in faqs %}
+        <div class="col-12">
+          <div class="bg-white border rounded-3 p-3">
+            <h5 class="mb-2">{{ faq.question }}</h5>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <span class="badge bg-light text-dark border">{{ faq.category or 'Общее' }}</span>
+              {% if faq.created_at %}
+                <small class="text-muted">{{ faq.created_at.strftime('%d.%m.%Y') }}</small>
+              {% endif %}
+            </div>
+            <div class="text-muted">
+              {{ faq.answer|replace('\n', '<br>')|safe }}
+            </div>
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+              <div class="mt-2">
+                <a href="{{ url_for('edit_faq', id=faq.id) }}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil me-1"></i>Редактировать
+                </a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <!-- Пустое состояние — выровнено по левому краю -->
+    <div class="text-muted">
+      <h4 class="mb-2">База знаний пуста</h4>
+      <p class="mb-3">Скоро здесь появятся полезные статьи и инструкции</p>
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
+        <a href="{{ url_for('add_faq') }}" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-circle me-1"></i>Добавить первую статью
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endblock %}

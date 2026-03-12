@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Админка — Техподдержка{% endblock %}
+
+{% block content %}
+<h2>Запросы в техподдержку</h2>
+<a href="/">← Назад к форме</a>
+
+{% for ticket in tickets %}
+<div style="border: 1px solid #ccc; padding: 15px; margin: 15px 0;">
+    <h3>{{ ticket.subject }} 
+        {% if ticket.is_resolved %}<span style="color: green;">[РЕШЕНО]</span>{% endif %}
+    </h3>
+    <p><strong>От:</strong> {{ ticket.name }} ({{ ticket.email }})</p>
+    <p><strong>Дата:</strong> {{ ticket.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+    <p><strong>Сообщение:</strong><br>{{ ticket.message|replace('\n', '<br>')|safe }}</p>
+
+    {% if not ticket.is_resolved %}
+    <form method="POST" style="margin-top: 10px;">
+        <input type="hidden" name="ticket_id" value="{{ ticket.id }}">
+        <textarea name="response" placeholder="Ваш ответ..." required></textarea><br>
+        <button type="submit">Отправить ответ</button>
+    </form>
+    {% else %}
+    <p><strong>Ответ:</strong><br>{{ ticket.response|replace('\n', '<br>')|safe }}</p>
+    {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

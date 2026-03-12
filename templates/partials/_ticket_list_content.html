@@ -1,0 +1,200 @@
+{# partial: tickets table/list. Used for AJAX обновления #}
+{% if tickets %}
+
+  {% macro sort_th(title, field, cls='') -%}
+    {% set is_cur = (current_sort == field) %}
+    {% set arrow = '▲' if (is_cur and current_dir == 'asc') else ('▼' if is_cur else '') %}
+    <th class="{{ cls }}">
+      <a class="bx-sort" href="{{ sort_url(field) }}" data-sort="{{ field }}">
+        <span>{{ title }}</span>
+        {% if arrow %}<span class="bx-sort__arrow">{{ arrow }}</span>{% endif %}
+      </a>
+    </th>
+  {%- endmacro %}
+
+  <div class="card card-table" id="ticketsTableCard">
+    <div class="table-wrap">
+      <table class="tickets-table">
+        <thead>
+          <tr>
+            {{ sort_th('ID', 'id', 'col-id') }}
+            {{ sort_th('Тема', 'subject', 'col-subject') }}
+            {{ sort_th('Организация', 'organization', 'col-org') }}
+            {{ sort_th('ИНН', 'inn', 'col-inn') }}
+            {{ sort_th('Создано', 'created', 'col-dates') }}
+            {{ sort_th('Обновлено', 'updated', 'col-dates') }}
+            {# Категорий больше нет #}
+            {% if is_operator or is_admin %}{{ sort_th('Отдел', 'department', 'col-dept') }}{% endif %}
+            {{ sort_th('Статус', 'status', 'col-status') }}
+            {{ sort_th('Крайний срок', 'sla', 'col-sla') }}
+            {% if is_operator or is_admin %}<th class="col-actions"></th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+{% from 'partials/svg.html' import svg %}
+{% for ticket in tickets %}
+            {% set u = ticket.display_user if ticket.display_user is defined else ticket.end_user_rel %}
+            {% set is_important = (ticket.priority or '') in ['critical','Критический'] %}
+            <tr class="{% if ticket.ui_is_overdue %}overdue{% endif %}" data-ticket-id="{{ ticket.id }}">
+              <td class="col-id fw-bold">
+                <span class="state-indicator {{ ticket.state_indicator or 'green' }}" title="{{ ticket.state_indicator_title or '' }}"></span>
+                <span class="ticket-id">{{ ticket.id|ticket_id }}</span>
+              </td>
+              <td class="col-subject">
+                <a href="{{ url_for('ticket_detail', ticket_id=ticket.id) }}" class="link">
+                  <span>{{ ticket.subject }}</span>{% if is_important %}<span class="ticket-fire-inline" title="Важная задача">{{ svg('fire','ico ico-fire') }}</span>{% endif %}
+                </a>
+              </td>
+              <td class="col-org">
+                {% if u and u.organization %}
+                  <span title="{{ u.organization }}">{{ u.organization|truncate(25) }}</span>
+                {% elif ticket.organization %}
+                  <span title="{{ ticket.organization }}">{{ ticket.organization|truncate(25) }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="col-inn">
+                {% set inn_value = (u.inn if u and u.inn else ticket.inn) %}
+                {% if inn_value %}
+                  {% if is_operator or is_admin %}<a class="link" href="{{ url_for('admin_organization_card', inn=inn_value) }}">{{ inn_value }}</a>{% else %}{{ inn_value }}{% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="col-dates">{{ ticket.created_at|localtime }}</td>
+              <td class="col-dates">
+                {% if ticket.history_rel and ticket.history_rel|length > 0 %}
+                  {% set last_history = ticket.history_rel|sort(attribute='timestamp', reverse=true)|first %}
+                  {{ last_history.timestamp|localtime }}
+                {% elif ticket.updated_at %}
+                  {{ ticket.updated_at|localtime }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              {% if is_operator or is_admin %}
+                <td class="col-dept">{{ ticket.department.name if ticket.department else '—' }}</td>
+              {% endif %}
+              <td class="col-status">
+                <span class="status-badge {{ status_badge_class(ticket.status) }}">
+                  {{ ticket.status }}
+                </span>
+              </td>
+              <td class="col-sla">
+                {% set sla = ticket.sla_view if ticket.sla_view is defined and ticket.sla_view else ticket_sla_view(ticket) %}
+                {% set sla_target = sla.first_response if sla.summary_deadline_type == 'first_response' else sla.resolve %}
+                {% set sla_deadline = sla.first_deadline if sla.summary_deadline_type == 'first_response' else sla.resolve_deadline %}
+                <div class="sla-bitrix sla-bitrix--list js-sla-live"
+                     data-deadline-iso="{{ sla_deadline.isoformat() ~ 'Z' if sla_deadline else '' }}"
+                     data-target-minutes="{{ sla_target.target_minutes or '' }}"
+                     data-state="{{ sla.summary_status }}"
+                     data-live="{{ 1 if (sla_deadline and not sla_target.completed and not sla_target.paused) else 0 }}"
+                     data-paused="{{ 1 if sla_target.paused else 0 }}"
+                     title="{{ sla.summary_title or ('Крайний срок ответа: ' ~ sla.first_response.deadline_text ~ ', крайний срок решения: ' ~ sla.resolve.deadline_text) }}">
+                  <span class="sla-chip sla-{{ sla.summary_status }} sla-bitrix__chip">{{ sla.summary }}</span>
+                </div>
+              </td>
+              {% if is_operator or is_admin %}
+                <td class="col-actions">
+                  <button type="button" class="icon-btn-sm js-copy-ticket" title="Скопировать ссылку" data-url="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">
+                    {{ svg('copy','ico') }}
+                  </button>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+
+  {# Низ таблицы: как в Bitrix — отдельная плашка на всю ширину с "Всего/Показать/Страницы" #}
+  <div class="bx-bottom-bar" role="navigation" aria-label="Навигация списка">
+    <div class="bx-bottom-bar__left">
+      <span class="bx-total">Всего: <b>{{ pagination.total if pagination else (tickets|length) }}</b></span>
+      <span class="bx-show">Показать:
+        <a class="bx-link {{ 'is-active' if show == 10 else '' }}" href="{{ show_url(10) }}" data-show="10">10</a>
+        |
+        <a class="bx-link {{ 'is-active' if show == 25 else '' }}" href="{{ show_url(25) }}" data-show="25">25</a>
+        |
+        <a class="bx-link {{ 'is-active' if show == 50 else '' }}" href="{{ show_url(50) }}" data-show="50">50</a>
+      </span>
+    </div>
+
+    <div class="bx-bottom-bar__right">
+      {% if pagination and pagination.pages and pagination.pages > 1 %}
+        <span class="bx-pages">Страницы:</span>
+        <nav class="bx-pagination" aria-label="Пагинация">
+          {# Bitrix-like pagination: plain links (no "cubes") #}
+          {% if pagination.has_prev %}
+            <a class="bx-page-link" href="{{ page_url(pagination.prev_num) }}" data-page="{{ pagination.prev_num }}">&laquo;</a>
+          {% else %}
+            <span class="bx-page-disabled">&laquo;</span>
+          {% endif %}
+
+          {% set start_p = pagination.page - 2 if pagination.page - 2 > 1 else 1 %}
+          {% set end_p = pagination.page + 2 if pagination.page + 2 < pagination.pages else pagination.pages %}
+
+          {% if start_p > 1 %}
+            <a class="bx-page-link" href="{{ page_url(1) }}" data-page="1">1</a>
+            {% if start_p > 2 %}<span class="bx-page-ellipsis">…</span>{% endif %}
+          {% endif %}
+
+          {% for p in range(start_p, end_p + 1) %}
+            {% if p == pagination.page %}
+              <span class="bx-page-current">{{ p }}</span>
+            {% else %}
+              <a class="bx-page-link" href="{{ page_url(p) }}" data-page="{{ p }}">{{ p }}</a>
+            {% endif %}
+          {% endfor %}
+
+          {% if end_p < pagination.pages %}
+            {% if end_p < pagination.pages - 1 %}<span class="bx-page-ellipsis">…</span>{% endif %}
+            <a class="bx-page-link" href="{{ page_url(pagination.pages) }}" data-page="{{ pagination.pages }}">{{ pagination.pages }}</a>
+          {% endif %}
+
+          {% if pagination.has_next %}
+            <a class="bx-page-link" href="{{ page_url(pagination.next_num) }}" data-page="{{ pagination.next_num }}">&raquo;</a>
+          {% else %}
+            <span class="bx-page-disabled">&raquo;</span>
+          {% endif %}
+        </nav>
+
+        {% if pagination.has_next %}
+          <a class="bx-next" href="{{ page_url(pagination.next_num) }}" data-page="{{ pagination.next_num }}">След.</a>
+        {% else %}
+          <span class="bx-next bx-page-disabled">След.</span>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {# Легенда индикаторов — под таблицей слева (как в Bitrix) #}
+  {% if is_operator %}
+    <div class="bx-legend-row">
+      <div class="state-legend" aria-label="Индикаторы состояний">
+        <div class="legend-title">Индикаторы состояний:</div>
+        <div class="legend-items">
+          <div class="legend-item"><span class="state-indicator orange"></span>- последний раз в обращение писал клиент техподдержки (вы ответственный)</div>
+          <div class="legend-item"><span class="state-indicator yellow"></span>- последний раз в обращение писал клиент техподдержки (вы не ответственный)</div>
+          <div class="legend-item"><span class="state-indicator green"></span>- последний раз в обращение писали вы</div>
+          <div class="legend-item"><span class="state-indicator blue"></span>- последний раз в обращение писал сотрудник техподдержки</div>
+          <div class="legend-item"><span class="state-indicator black"></span>- обращение закрыто</div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+
+{% else %}
+  <div class="empty-state">
+    <div class="empty-title">Заявок не найдено</div>
+    <div class="empty-text">Попробуй изменить фильтры или сбросить их.</div>
+    <div class="empty-actions">
+      <a class="btn btn-action btn-sm" href="{{ url_for('ticket_list') }}">Сбросить фильтры</a>
+      <a class="btn btn-action-primary btn-sm" href="{{ url_for('create_ticket') }}">Создать заявку</a>
+    </div>
+  </div>
+{% endif %}

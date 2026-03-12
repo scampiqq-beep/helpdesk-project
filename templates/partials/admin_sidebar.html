@@ -1,0 +1,102 @@
+<style>
+.admin-shell{display:grid;grid-template-columns:196px minmax(0,1fr);gap:10px;align-items:start}
+.admin-sidebar{position:sticky;top:80px;display:grid;gap:4px}
+.admin-sidebar__card{background:var(--surface,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:6px;box-shadow:var(--shadow-sm,0 8px 20px rgba(15,23,42,.04))}
+.admin-sidebar__nav{display:grid;gap:2px}
+.admin-sidebar__link,.admin-sidebar__toggle,.admin-sidebar__sublink{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;text-decoration:none;color:var(--text,#111827);border:1px solid transparent;font-size:.8rem;background:none;width:100%;text-align:left;cursor:pointer;line-height:1.15}
+.admin-sidebar__link:hover,.admin-sidebar__toggle:hover,.admin-sidebar__sublink:hover{background:var(--surface-2,var(--bg));border-color:var(--border,#e5e7eb)}
+.admin-sidebar__link.active,.admin-sidebar__toggle.active{background:color-mix(in oklab, var(--accent,#2563eb) 11%, var(--surface,#fff));border-color:color-mix(in oklab, var(--accent,#2563eb) 36%, var(--border,#e5e7eb));color:var(--text,#111827);font-weight:700}.admin-sidebar__sublink.active{background:transparent;border-color:transparent;color:var(--muted,#6b7280);font-weight:400}
+.admin-sidebar__menu{position:relative}
+.admin-sidebar__dropdown{display:none;margin-top:3px;padding-top:3px;border-top:1px solid var(--border,#e5e7eb)}
+.admin-sidebar__menu.open .admin-sidebar__dropdown{display:grid;gap:2px}
+.admin-sidebar__sublink{padding-left:13px;font-size:.72rem;color:var(--muted,#6b7280)}
+.admin-sidebar__caret{margin-left:auto;transition:transform .16s ease}
+.admin-sidebar__menu.open .admin-sidebar__caret{transform:rotate(180deg)}
+.admin-main{min-width:0}
+.admin-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
+.admin-page-title{margin:0;font-size:1.45rem;font-weight:800}
+.admin-page-subtitle{margin:6px 0 0;color:var(--muted)}
+@media (max-width: 1100px){.admin-shell{grid-template-columns:1fr}.admin-sidebar{position:static}}
+</style>
+{% set _ep = request.endpoint or '' %}
+{% set _is_admin = current_user.is_authenticated and current_user.role == 'admin' %}
+{% set _is_operator = current_user.is_authenticated and is_tp_operator(current_user) %}
+{% set _settings_section = section if section is defined else request.args.get('tab', '') %}
+{% set _refs_open = _ep == 'admin_settings_section' and _settings_section in ['departments','categories','tags'] %}
+{% set _sla_open = _ep in ['admin_sla_settings','admin_work_calendar','admin_sla_calendar'] %}
+{% set _process_open = (_ep in ['admin_automation_index','admin_automation_preview']) or (_ep == 'admin_settings_section' and _settings_section in ['notifications','important_rules']) %}
+{% set _mail_open = _ep == 'admin_settings_section' and _settings_section in ['mail_parser','mail_outgoing','mail_templates','mail_logs'] %}
+{% set _control_open = _ep == 'admin_audit' %}
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar__card">
+      <nav class="admin-sidebar__nav">
+        <a class="admin-sidebar__link {{ 'active' if _ep in ['admin','admin_dashboard'] else '' }}" href="{{ url_for('admin_dashboard') }}">Главная</a>
+        <a class="admin-sidebar__link {{ 'active' if _ep in ['admin_users','admin_user_edit','admin_edit_enduser'] else '' }}" href="{{ url_for('admin_users') }}">Пользователи</a>
+        <a class="admin-sidebar__link {{ 'active' if _ep in ['admin_organizations','admin_organization_card'] else '' }}" href="{{ url_for('admin_organizations') }}">Организации</a>
+        <a class="admin-sidebar__link {{ 'active' if _ep in ['admin_reports','admin_reports_legacy','admin_reports_export_xlsx'] else '' }}" href="{{ url_for('admin_reports') }}">Отчёты</a>
+        <a class="admin-sidebar__link {{ 'active' if _ep in ['admin_statistics','admin_analytics','admin_stats','admin_charts','admin_analytics_export'] else '' }}" href="{{ url_for('admin_statistics') }}">Статистика</a>
+
+        {% if _is_admin %}
+        <div class="admin-sidebar__menu {{ 'open' if _refs_open else '' }}" id="adminSidebarRefs">
+          <button type="button" class="admin-sidebar__toggle {{ 'active' if _refs_open else '' }}" onclick="(function(){var m=document.getElementById('adminSidebarRefs'); if(m){m.classList.toggle('open');}})()">
+            <span>Справочники</span>
+            <span class="admin-sidebar__caret">▾</span>
+          </button>
+          <div class="admin-sidebar__dropdown">
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'departments' else '' }}" href="{{ url_for('admin_settings_section', section='departments') }}">Отделы</a>
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'categories' else '' }}" href="{{ url_for('admin_settings_section', section='categories') }}">Категории</a>
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'tags' else '' }}" href="{{ url_for('admin_settings_section', section='tags') }}">Теги</a>
+          </div>
+        </div>
+
+        <div class="admin-sidebar__menu {{ 'open' if _sla_open else '' }}" id="adminSidebarSla">
+          <button type="button" class="admin-sidebar__toggle {{ 'active' if _sla_open else '' }}" onclick="(function(){var m=document.getElementById('adminSidebarSla'); if(m){m.classList.toggle('open');}})()">
+            <span>SLA</span>
+            <span class="admin-sidebar__caret">▾</span>
+          </button>
+          <div class="admin-sidebar__dropdown">
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_sla_settings' else '' }}" href="{{ url_for('admin_sla_settings') }}">Настройки SLA</a>
+            <a class="admin-sidebar__sublink {{ 'active' if _ep in ['admin_work_calendar','admin_sla_calendar'] else '' }}" href="{{ url_for('admin_work_calendar') }}">Производственный календарь</a>
+          </div>
+        </div>
+
+        <div class="admin-sidebar__menu {{ 'open' if _process_open else '' }}" id="adminSidebarProcesses">
+          <button type="button" class="admin-sidebar__toggle {{ 'active' if _process_open else '' }}" onclick="(function(){var m=document.getElementById('adminSidebarProcesses'); if(m){m.classList.toggle('open');}})()">
+            <span>Процессы</span>
+            <span class="admin-sidebar__caret">▾</span>
+          </button>
+          <div class="admin-sidebar__dropdown">
+            <a class="admin-sidebar__sublink {{ 'active' if _ep in ['admin_automation_index','admin_automation_preview'] else '' }}" href="{{ url_for('admin_automation_index') }}">Автоматизация</a>
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'notifications' else '' }}" href="{{ url_for('admin_settings_section', section='notifications') }}">Уведомления</a>
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'important_rules' else '' }}" href="{{ url_for('admin_settings_section', section='important_rules') }}">Важность задач</a>
+          </div>
+        </div>
+
+        <div class="admin-sidebar__menu {{ 'open' if _mail_open else '' }}" id="adminSidebarMail">
+          <button type="button" class="admin-sidebar__toggle {{ 'active' if _mail_open else '' }}" onclick="(function(){var m=document.getElementById('adminSidebarMail'); if(m){m.classList.toggle('open');}})()">
+            <span>Почта</span>
+            <span class="admin-sidebar__caret">▾</span>
+          </button>
+          <div class="admin-sidebar__dropdown">
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'mail_parser' else '' }}" href="{{ url_for('admin_settings_section', section='mail_parser') }}">Парсер почты</a>
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'mail_outgoing' else '' }}" href="{{ url_for('admin_settings_section', section='mail_outgoing') }}">Исходящая почта</a>
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'mail_templates' else '' }}" href="{{ url_for('admin_settings_section', section='mail_templates') }}">Шаблоны писем</a>
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_settings_section' and _settings_section == 'mail_logs' else '' }}" href="{{ url_for('admin_settings_section', section='mail_logs') }}">Почтовый журнал</a>
+          </div>
+        </div>
+
+        <div class="admin-sidebar__menu {{ 'open' if _control_open else '' }}" id="adminSidebarControl">
+          <button type="button" class="admin-sidebar__toggle {{ 'active' if _control_open else '' }}" onclick="(function(){var m=document.getElementById('adminSidebarControl'); if(m){m.classList.toggle('open');}})()">
+            <span>Контроль</span>
+            <span class="admin-sidebar__caret">▾</span>
+          </button>
+          <div class="admin-sidebar__dropdown">
+            <a class="admin-sidebar__sublink {{ 'active' if _ep == 'admin_audit' else '' }}" href="{{ url_for('admin_audit') }}">Журнал аудита</a>
+          </div>
+        </div>
+        {% endif %}
+      </nav>
+    </div>
+  </aside>
+  <section class="admin-main">

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Уведомления{% endblock %}
+{% block content %}
+<div class="page-toolbar">
+  <div class="page-title">Уведомления</div>
+  <div class="page-actions">
+    <form method="post" action="/notifications/mark-all-read" class="m-0">
+      <button type="submit" class="btn btn-primary btn-sm">Прочитать всё</button>
+    </form>
+  </div>
+</div>
+
+<div class="card-outer">
+  <div class="card">
+    {% if opchat_threads %}
+      <div class="notifications-page-list">
+        <div class="notif-sep">Операторский чат</div>
+        {% for t in opchat_threads %}
+          <a class="notif-row unread" href="/ticket/{{ t.ticket_id }}?open_opchat=1">
+            <div class="notif-row-main">
+              <div class="notif-row-title">Тикет #{{ t.ticket_id }} · {{ t.last_author }} · {{ t.unread }} непрочит.</div>
+              {% if t.last_message %}<div class="notif-row-body">{{ t.last_message }}</div>{% endif %}
+            </div>
+            <div class="notif-row-time">{{ t.last_at }}</div>
+          </a>
+        {% endfor %}
+      </div>
+      <div class="p-2"></div>
+    {% endif %}
+    {% if items %}
+      <div class="notifications-page-list">
+        {% for n in items %}
+          <a class="notif-row {% if not n.is_read %}unread{% endif %}" href="/n/{{ n.id }}">
+            <div class="notif-row-main">
+              <div class="notif-row-title">{{ n.title }}</div>
+              {% if n.body %}<div class="notif-row-body">{{ n.body }}</div>{% endif %}
+            </div>
+            <div class="notif-row-time">{{ n.created_at.strftime("%d.%m.%Y %H:%M") if n.created_at else "" }}</div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% if not opchat_threads %}
+        <div class="p-3 text-muted">Нет уведомлений</div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% if pages > 1 %}
+  <div class="pagination-wrap">
+    {% for p in range(1, pages+1) %}
+      <a class="page-link {% if p==page %}active{% endif %}" href="{{ url_for('notifications_page', page=p) }}">{{ p }}</a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="notifications-footer">
+  Всего уведомлений: <strong>{{ total }}</strong>
+</div>
+{% endblock %}

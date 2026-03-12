@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+
+{% block title %}Профиль — Техподдержка{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // UI theme
+  const themeModal = document.getElementById('uiThemeModal');
+  if(themeModal){
+    themeModal.addEventListener('change', function(e){
+      const r = e.target;
+      if(!r || r.name !== 'ui_theme') return;
+      const theme = r.value;
+      document.documentElement.setAttribute('data-theme', theme);
+      try{ localStorage.setItem('hd_theme', theme); }catch(_e){}
+      fetch('/api/ui/theme', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({theme})})
+        .catch(()=>{});
+    });
+  }
+
+  const orgModal = document.getElementById('editOrgModal');
+  if (!orgModal) return;
+
+  document.querySelectorAll('[data-bs-target="#editOrgModal"]').forEach(btn => {
+    btn.addEventListener('click', function() {
+    const email = "{{ current_user.email or '' }}";
+    if (!email) return;
+
+    const innEl = orgModal.querySelector('#editOrgModal input[name="inn"]');
+    const addrEl = orgModal.querySelector('#editOrgModal input[name="address"]');
+    const orgEl = orgModal.querySelector('#editOrgModal input[name="organization"]');
+
+    // Подтягиваем из CRM только если поля пустые
+    if ((innEl && innEl.value) || (addrEl && addrEl.value) || (orgEl && orgEl.value)) return;
+
+    fetch('/api/bitrix/company-by-email?email=' + encodeURIComponent(email))
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.success) {
+          if (orgEl) orgEl.value = data.company_name || '';
+          if (innEl) innEl.value = data.inn || '';
+          if (addrEl) addrEl.value = data.address || '';
+        }
+      })
+      .catch(() => {});
+    });
+  });
+});
+</script>
+{% endblock %}
+
+{% block page_title %}Профиль{% endblock %}
+
+{% block content %}
+
+{% set fio = [current_user.last_name, current_user.name, current_user.patronymic] | select | join(' ') %}
+
+<div class="card">
+  <div class="card-header">
+    <div class="profile-head">
+      <div class="profile-avatar" aria-hidden="true"></div>
+      <div class="profile-head-main">
+        <div class="profile-name">{{ fio or current_user.email }}</div>
+        <div class="profile-sub">
+          <span class="chip">{{ 'Оператор' if current_user.is_operator() else 'Клиент' }}</span>
+          <span class="chip">{{ 'Активен' if current_user.is_active else 'Заблокирован' }}</span>
+          {% if current_user.is_operator() %}
+            {% if current_user.departments and current_user.departments|length %}
+              <span class="chip">Отделы: {{ current_user.departments | map(attribute="name") | join(', ') }}</span>
+            {% elif current_user.department %}
+              <span class="chip">Отдел: {{ current_user.department.name }}</span>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Предложенные реквизиты (из CRM/парсера) — показываем прямо на странице, не только в модалке #}
+  {% if current_user.suggested_organization or current_user.suggested_inn or current_user.suggested_address %}
+  <div class="card-body pt-3 pb-0">
+    <div class="alert alert-warning mb-0" role="alert" style="border-radius:12px;">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <div class="fw-semibold">Найдены предложенные реквизиты организации</div>
+          <div class="small mt-1">
+            <div>
+              {{ current_user.suggested_organization or '—' }}
+              {% if current_user.suggested_inn %} (ИНН {{ current_user.suggested_inn }}){% endif %}
+            </div>
+            {% if current_user.suggested_address %}
+              <div class="mt-1">{{ current_user.suggested_address }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <form method="post" class="m-0">
+            <input type="hidden" name="action" value="apply_suggested_org">
+            <button class="btn btn-sm btn-primary" type="submit">Принять</button>
+          </form>
+          <form method="post" class="m-0">
+            <input type="hidden" name="action" value="dismiss_suggested_org">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Скрыть</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card-body">
+    <div class="profile-grid">
+      <div class="profile-field">
+        <div class="profile-label">Email</div>
+        <div class="profile-value">
+          {{ current_user.email or '—' }}
+          {% if current_user.email_verified %}
+            <span class="email-verified" title="Email подтверждён">✓ подтверждён</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="profile-field">
+        <div class="profile-label">Дата регистрации</div>
+        <div class="profile-value">{{ current_user.created_at.strftime('%d.%m.%Y') if current_user.created_at else '—' }}</div>
+      </div>
+
+      <div class="profile-field">
+        <div class="profile-label">Телефон</div>
+        <div class="profile-value">{{ current_user.phone or '—' }}</div>
+      </div>
+
+      {% if not current_user.is_operator() %}
+      <div class="profile-field">
+        <div class="profile-label">Организация</div>
+        <div class="profile-value">{{ current_user.organization or '—' }}</div>
+      </div>
+      <div class="profile-field">
+        <div class="profile-label">ИНН</div>
+        <div class="profile-value">{{ current_user.inn or '—' }}</div>
+      </div>
+      <div class="profile-field" style="grid-column: 1 / -1;">
+        <div class="profile-label">Адрес</div>
+        <div class="profile-value">{{ current_user.address or '—' }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="profile-actions">
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editFioModal">
+        Изменить ФИО
+      </button>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPhoneModal">
+        Изменить телефон
+      </button>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editNotifyModal">
+        Уведомления
+      </button>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+        Сменить пароль
+      </button>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#uiThemeModal">
+        Оформление
+      </button>
+      {% if not current_user.is_operator() %}
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editOrgModal">
+        Изменить реквизиты
+      </button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Тема оформления -->
+<div class="modal fade" id="uiThemeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Оформление</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="segmented" role="radiogroup" aria-label="Тема">
+          {% set t = (current_user.ui_theme or 'light') %}
+          <label class="segmented-item">
+            <input type="radio" name="ui_theme" value="light" {% if t != 'dark' %}checked{% endif %}>
+            <span>Светлая</span>
+          </label>
+          <label class="segmented-item">
+            <input type="radio" name="ui_theme" value="dark" {% if t == 'dark' %}checked{% endif %}>
+            <span>Тёмная</span>
+          </label>
+        </div>
+        <div class="form-text" style="margin-top:.6rem;">Тема применяется сразу и запоминается для вашего профиля.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === МОДАЛЬНЫЕ ОКНА === -->
+
+<!-- ФИО -->
+<div class="modal fade" id="editFioModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person me-2"></i>Изменить ФИО</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('user_profile') }}">
+        <input type="hidden" name="action" value="update_profile">
+        <input type="hidden" name="email" value="{{ current_user.email or '' }}">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Фамилия <span class="text-danger">*</span></label>
+              <input type="text" name="last_name" class="form-control" required 
+                     value="{{ current_user.last_name or '' }}">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Имя <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" required
+                     value="{{ current_user.name or '' }}">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Отчество <span class="text-danger">*</span></label>
+              <input type="text" name="patronymic" class="form-control" required
+                     value="{{ current_user.patronymic or '' }}">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Пароль -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-shield-lock me-2"></i>Смена пароля</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('user_profile') }}">
+        <input type="hidden" name="action" value="change_password">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Текущий пароль <span class="text-danger">*</span></label>
+            <input type="password" name="current_password" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Новый пароль <span class="text-danger">*</span></label>
+            <input type="password" name="new_password" class="form-control" minlength="6" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Повторите пароль <span class="text-danger">*</span></label>
+            <input type="password" name="confirm_password" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сменить пароль</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Телефон (отдельно) -->
+<div class="modal fade" id="editPhoneModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-telephone me-2"></i>Изменить телефон</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('user_profile') }}">
+        <input type="hidden" name="action" value="update_phone">
+        <div class="modal-body">
+          <label class="form-label">Телефон</label>
+          <input type="text" name="phone" class="form-control" value="{{ current_user.phone or '' }}" placeholder="+7...">
+          <div class="form-text">Можно оставить пустым, если телефон не требуется.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Уведомления (отдельно) -->
+<div class="modal fade" id="editNotifyModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-bell me-2"></i>Уведомления</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('user_profile') }}">
+        <input type="hidden" name="action" value="update_notifications">
+        <div class="modal-body">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="notify_inapp_enabled" name="notify_inapp_enabled" {% if current_user.notify_inapp_enabled %}checked{% endif %}>
+            <label class="form-check-label" for="notify_inapp_enabled">Включить уведомления (в системе)</label>
+          </div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="notify_event_assigned" name="notify_event_assigned" {% if current_user.notify_event_assigned %}checked{% endif %}>
+            <label class="form-check-label" for="notify_event_assigned">Назначение/привязка тикета</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="notify_event_customer_reply" name="notify_event_customer_reply" {% if current_user.notify_event_customer_reply %}checked{% endif %}>
+            <label class="form-check-label" for="notify_event_customer_reply">Ответ клиента</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="notify_event_status" name="notify_event_status" {% if current_user.notify_event_status %}checked{% endif %}>
+            <label class="form-check-label" for="notify_event_status">Изменение статуса</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Реквизиты (для клиента) -->
+{% if not current_user.is_operator() %}
+<div class="modal fade" id="editOrgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-building me-2"></i>Реквизиты организации</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('user_profile') }}">
+        <input type="hidden" name="action" value="update_org">
+        <div class="modal-body">
+          {% if current_user.suggested_organization or current_user.suggested_inn or current_user.suggested_address %}
+            <div class="alert alert-info">
+              <div class="fw-semibold">Есть предложенные реквизиты (из CRM)</div>
+              <div class="small mt-1">
+                {{ current_user.suggested_organization or '—' }}
+                {% if current_user.suggested_inn %} (ИНН {{ current_user.suggested_inn }}){% endif %}
+                {% if current_user.suggested_address %}<div class="mt-1">{{ current_user.suggested_address }}</div>{% endif %}
+              </div>
+              <div class="d-flex gap-2 mt-2">
+                <form method="POST" action="{{ url_for('user_profile') }}" class="m-0">
+                  <input type="hidden" name="action" value="apply_suggested_org">
+                  <button type="submit" class="btn btn-sm btn-primary">Принять</button>
+                </form>
+                <form method="POST" action="{{ url_for('user_profile') }}" class="m-0">
+                  <input type="hidden" name="action" value="dismiss_suggested_org">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">Скрыть</button>
+                </form>
+              </div>
+            </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label">Организация</label>
+            <input type="text" name="organization" class="form-control"
+                   value="{{ current_user.organization or '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">ИНН (10–14 цифр) <span class="text-danger">*</span></label>
+            <input type="text" name="inn" class="form-control" required
+                   value="{{ current_user.inn or '' }}" 
+                   pattern="[0-9]{10,14}" maxlength="14">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Адрес организации <span class="text-danger">*</span></label>
+            <input type="text" name="address" class="form-control" required
+                   value="{{ current_user.address or '' }}">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

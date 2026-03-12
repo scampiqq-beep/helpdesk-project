@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Карточка организации{% endblock %}
+
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<div class="page-container">
+  <div class="page-toolbar" style="margin-bottom:16px;">
+    <div class="page-title"><span>{{ organization_name }} · ИНН {{ inn }}</span></div>
+    <div class="page-actions">
+      <a class="btn btn-action" href="{{ url_for('admin_support_list', inn=inn) }}">Все заявки по ИНН</a>
+      <a class="btn btn-action" href="{{ url_for('admin_users') }}">Пользователи</a>
+    </div>
+  </div>
+<style>
+.org-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:18px}
+.org-card{background:var(--surface,#fff);border:1px solid var(--border,#dfe3e8);border-radius:14px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.04)}
+.org-card h3{margin:0 0 12px;font-size:18px}.org-kpi{font-size:28px;font-weight:700}.org-sub{color:var(--muted,#6b7280);font-size:13px}
+.org-layout{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}.org-list{display:grid;gap:12px}.org-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--border,#e5e7eb)}
+.org-row:last-child{border-bottom:none}.org-table{width:100%;border-collapse:collapse}.org-table th,.org-table td{padding:10px 12px;border-bottom:1px solid var(--border,#e5e7eb);vertical-align:top;text-align:left}
+.org-chip{display:inline-block;padding:4px 8px;border-radius:999px;background:color-mix(in oklab, var(--accent,#3b82f6) 10%, white);font-size:12px}.muted{color:var(--muted,#6b7280)}
+.note{padding:10px 12px;border-left:3px solid var(--accent,#3b82f6);background:color-mix(in oklab, var(--accent,#3b82f6) 7%, white);border-radius:8px;margin-bottom:10px}
+@media (max-width: 1100px){.org-grid,.org-layout{grid-template-columns:1fr}}
+</style>
+
+<div class="org-grid">
+  <div class="org-card"><div class="org-kpi">{{ stats.total_tickets }}</div><div class="org-sub">Всего обращений</div></div>
+  <div class="org-card"><div class="org-kpi">{{ stats.open_tickets }}</div><div class="org-sub">Открытых заявок</div></div>
+  <div class="org-card"><div class="org-kpi">{{ stats.contacts_count }}</div><div class="org-sub">Контактных лиц</div></div>
+  <div class="org-card"><div class="org-kpi">{{ sla_summary.compliance_percent }}%</div><div class="org-sub">Соблюдение SLA по решению</div></div>
+</div>
+
+<div class="org-layout">
+  <div class="org-list">
+    <section class="org-card">
+      <h3>Реквизиты</h3>
+      <div class="org-row"><strong>Основное название</strong><span>{{ organization_name }}</span></div>
+      <div class="org-row"><strong>ИНН</strong><span>{{ inn }}</span></div>
+      <div class="org-row"><strong>Подтверждённых контактов</strong><span>{{ stats.confirmed_count }}</span></div>
+      <div class="org-row"><strong>Предложенных контактов</strong><span>{{ stats.suggested_count }}</span></div>
+      <div class="org-row"><strong>Адреса</strong><span>{% if addresses %}{{ addresses|join(' · ') }}{% else %}<span class="muted">—</span>{% endif %}</span></div>
+    </section>
+
+    <section class="org-card">
+      <h3>Контактные лица</h3>
+      {% if contacts %}
+      <table class="org-table">
+        <thead><tr><th>Контакт</th><th>Должность</th><th>Email / телефон</th><th>Источник</th></tr></thead>
+        <tbody>
+          {% for c in contacts %}
+          <tr>
+            <td>{{ c.fio }}</td>
+            <td>{{ c.position or '—' }}</td>
+            <td>{{ c.email or '—' }}<br><span class="muted">{{ c.phone or '' }}</span></td>
+            <td><span class="org-chip">{{ 'Подтверждено' if c.source == 'confirmed' else 'Предложено' }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="muted">Контакты пока не найдены.</div>
+      {% endif %}
+    </section>
+
+    <section class="org-card">
+      <h3>История обращений</h3>
+      {% if ticket_history %}
+      <table class="org-table">
+        <thead><tr><th>ID</th><th>Тема</th><th>Статус</th><th>Создано</th></tr></thead>
+        <tbody>
+          {% for t in ticket_history %}
+          <tr>
+            <td><a href="{{ url_for('ticket_detail', ticket_id=t.id) }}">#{{ t.id }}</a></td>
+            <td>{{ t.subject }}</td>
+            <td>{{ t.status }}</td>
+            <td>{{ t.created_at|localtime if t.created_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="muted">Обращений ещё нет.</div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="org-list">
+    <section class="org-card">
+      <h3>SLA клиента</h3>
+      <div class="org-row"><strong>Первый ответ — в срок</strong><span>{{ sla_summary.first_response_ok }}</span></div>
+      <div class="org-row"><strong>Первый ответ — нарушено</strong><span>{{ sla_summary.first_response_overdue }}</span></div>
+      <div class="org-row"><strong>Решение — в срок</strong><span>{{ sla_summary.resolve_ok }}</span></div>
+      <div class="org-row"><strong>Решение — нарушено</strong><span>{{ sla_summary.resolve_overdue }}</span></div>
+      <div class="org-row"><strong>Активных просроченных</strong><span>{{ sla_summary.active_overdue }}</span></div>
+    </section>
+
+    <section class="org-card">
+      <h3>Внутренние заметки по организации</h3>
+      {% if internal_notes %}
+        {% for t in internal_notes %}
+          <div class="note">
+            <div><strong><a href="{{ url_for('ticket_detail', ticket_id=t.id) }}">Заявка #{{ t.id }}</a></strong></div>
+            <div class="muted" style="margin:4px 0 6px">{{ t.subject }}</div>
+            <div>{{ t.internal_comment }}</div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="muted">Пока нет отдельных внутренних заметок. Здесь показываются internal comment из заявок по этому ИНН.</div>
+      {% endif %}
+    </section>
+
+    <section class="org-card">
+      <h3>Предложенные реквизиты</h3>
+      {% if suggested_users %}
+      <table class="org-table">
+        <thead><tr><th>Клиент</th><th>Организация</th><th>Адрес</th></tr></thead>
+        <tbody>
+          {% for u in suggested_users %}
+          <tr>
+            <td>{{ [u.last_name, u.name, u.patronymic]|select|join(' ') or u.email or u.username }}</td>
+            <td>{{ u.suggested_organization or '—' }}</td>
+            <td>{{ u.suggested_address or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="muted">Неподтверждённых реквизитов нет.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+</div>
+  </section>
+</div>
+{% endblock %}

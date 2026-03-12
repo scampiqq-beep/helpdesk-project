@@ -1,0 +1,10 @@
+{# templates/partials/svg.html
+   Мини-хелпер для локальных SVG-иконок.
+   Использование: {% from 'partials/svg.html' import svg %}  {{ svg('inbox') }}
+#}
+
+{% macro svg(name, cls='ico') -%}
+  <svg class="{{ cls }}" aria-hidden="true" focusable="false">
+    <use href="{{ url_for('static', filename='icons/sprite.svg') }}#{{ name }}"></use>
+  </svg>
+{%- endmacro %}

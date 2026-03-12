@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Инструкции — Техподдержка{% endblock %}
+{% block page_title %}<i class="bi bi-journal-text me-2"></i>Инструкции{% endblock %}
+
+{% block content %}
+<div class="instructions-page">
+<div class="row g-3">
+  <!-- Основной контент -->
+  <div class="col-lg-8">
+
+    <!-- Как пользоваться системой -->
+    <div class="card mb-4">
+      <div class="card-header bg-light d-flex align-items-center">
+        <i class="bi bi-play-circle-fill text-primary me-2"></i>
+        <h5 class="mb-0">Как пользоваться системой</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="accordion" id="usageAccordion">
+          {% for step in [
+            {
+              'num': 1,
+              'title': 'Создайте заявку',
+              'text': 'Опишите проблему в разделе «Создать заявку» и отправьте.',
+              'color': 'primary'
+            },
+            {
+              'num': 2,
+              'title': 'Следите за статусом',
+              'text': 'Все ваши заявки — в разделе «Мои обращения».',
+              'color': 'info'
+            },
+            {
+              'num': 3,
+              'title': 'Общайтесь в чате',
+              'text': 'Ответы оператора и ваши комментарии — в карточке заявки.',
+              'color': 'success'
+            },
+            {
+              'num': 4,
+              'title': 'Подтвердите завершение',
+              'text': 'После решения нажмите «Принять работу».',
+              'color': 'warning'
+            }
+          ] %}
+          <div class="accordion-item border-0">
+            <h2 class="accordion-header" id="headingStep{{ step.num }}">
+              <button class="accordion-button collapsed py-3 px-3 d-flex align-items-center"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#collapseStep{{ step.num }}"
+                      aria-expanded="false"
+                      aria-controls="collapseStep{{ step.num }}">
+                <span class="badge bg-{{ step.color }} rounded-circle d-flex align-items-center justify-content-center me-3"
+                      style="width: 28px; height: 28px; font-size: 0.85rem; font-weight: 600;">
+                  {{ step.num }}
+                </span>
+                <strong>{{ step.title }}</strong>
+              </button>
+            </h2>
+            <div id="collapseStep{{ step.num }}"
+                 class="accordion-collapse collapse"
+                 aria-labelledby="headingStep{{ step.num }}"
+                 data-bs-parent="#usageAccordion">
+              <div class="accordion-body py-2 px-3 text-muted">
+                {{ step.text }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Частые вопросы -->
+    <div class="card">
+      <div class="card-header bg-light d-flex align-items-center">
+        <i class="bi bi-question-circle-fill text-info me-2"></i>
+        <h5 class="mb-0">Частые вопросы</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="accordion" id="faqAccordion">
+          {% for faq in [
+            {
+              'q': 'Сколько ждать ответа?',
+              'a': 'Обычно — в течение рабочего дня. Критические заявки — быстрее.'
+            },
+            {
+              'q': 'Можно ли прикреплять файлы?',
+              'a': 'Да — при создании или в процессе обработки.'
+            },
+            {
+              'q': 'Кто мой оператор?',
+              'a': 'Имя и отдел указаны в деталях заявки.'
+            }
+          ] %}
+          <div class="accordion-item border-0">
+            <h2 class="accordion-header" id="headingFaq{{ loop.index }}">
+              <button class="accordion-button collapsed py-3 px-3"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#collapseFaq{{ loop.index }}"
+                      aria-expanded="false"
+                      aria-controls="collapseFaq{{ loop.index }}">
+                {{ faq.q }}
+              </button>
+            </h2>
+            <div id="collapseFaq{{ loop.index }}"
+                 class="accordion-collapse collapse"
+                 aria-labelledby="headingFaq{{ loop.index }}"
+                 data-bs-parent="#faqAccordion">
+              <div class="accordion-body py-2 px-3 text-muted">
+                {{ faq.a }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Справочная панель -->
+  <div class="col-lg-4">
+    <!-- Статусы заявок -->
+<div class="card mb-4">
+  <div class="card-header bg-light">
+    <h6 class="mb-0">Статусы заявок</h6>
+  </div>
+  <div class="card-body">
+    <div class="d-flex align-items-start gap-2 mb-3">
+      <span class="status-badge status-new">Новая</span>
+      <small class="text-muted">Заявка создана, ожидает обработки</small>
+    </div>
+    <div class="d-flex align-items-start gap-2 mb-3">
+      <span class="status-badge status-accepted">Принята</span>
+      <small class="text-muted">Оператор работает над решением</small>
+    </div>
+    <div class="d-flex align-items-start gap-2">
+      <span class="status-badge status-completed">Завершена</span>
+      <small class="text-muted">Работа выполнена, ожидает подтверждения</small>
+    </div>
+  </div>
+</div>
+
+    <!-- Приоритеты -->
+    <div class="card">
+      <div class="card-header bg-light">
+        <h6 class="mb-0">Приоритеты</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-2">
+          Отображаются <strong>цветной полосой слева</strong> от строки заявки:
+        </p>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <div style="width: 4px; height: 16px; background-color: #dc3545;"></div>
+          <span class="text-danger small">Высокий — критическая проблема</span>
+        </div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <div style="width: 4px; height: 16px; background-color: #fd7e14;"></div>
+          <span class="text-warning small">Средний — мешает работе</span>
+        </div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <div style="width: 4px; height: 16px; background-color: #198754;"></div>
+          <span class="text-success small">Низкий — вопрос или улучшение</span>
+        </div>
+        <p class="text-muted small mb-0 mt-2">
+          Приоритет может изменить оператор. Заявки старше 24 часов автоматически повышаются.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

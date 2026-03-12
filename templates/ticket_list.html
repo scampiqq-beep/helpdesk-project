@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% from 'partials/svg.html' import svg %}
+{% block page_title %}{% endblock %}
+
+{% block content %}
+
+{# Верхняя панель страницы (единый стиль) #}
+<div class="page-toolbar">
+  <div class="page-title">
+    {{ svg('inbox') }}
+    <span>Заявки</span>
+  </div>
+
+  <div class="page-actions">
+    <form class="quick-search" id="quickSearch" method="GET" action="{{ url_for('ticket_list') }}">
+      <input class="input input-sm" type="text" name="subject" value="{{ request.args.get('subject','') }}" placeholder="Поиск..." aria-label="Поиск по теме">
+    </form>
+
+    <a class="btn btn-action-primary btn-sm" href="{{ url_for('create_ticket') }}">
+      {{ svg('edit','ico') }}Создать заявку
+    </a>
+
+    <button class="btn btn-action btn-sm" type="button" id="filterToggle" aria-expanded="false" aria-controls="filterPanel">
+      {{ svg('settings','ico') }}Фильтры
+    </button>
+
+    <button class="btn btn-action btn-sm" type="button" id="compactToggle" title="Компактный режим">
+      {{ svg('kanban','ico') }}Компактно
+    </button>
+
+    {# Сортировка «Обновлено/Создано» и «Важные сверху» убраны: не используются #}
+  </div>
+</div>
+
+
+<div class="filter-wrapper">
+  <div id="filterPanel" class="filter-panel" aria-hidden="true">
+    {% if is_operator %}
+      <form id="filterForm" method="GET" class="filter-form">
+        <input type="hidden" name="show" value="{{ request.args.get('show', show or 10) }}">
+        <input type="hidden" name="sort" value="{{ request.args.get('sort', current_sort or 'created') }}">
+        <input type="hidden" name="dir" value="{{ request.args.get('dir', current_dir or 'desc') }}">
+        <div class="filter-grid">
+          <div class="field">
+            <label>ID</label>
+            <input class="input" type="text" name="id" value="{{ request.args.get('id','') }}" placeholder="123">
+          </div>
+
+          <div class="field field-wide">
+            <label>Тема</label>
+            <input class="input" type="text" name="subject" value="{{ request.args.get('subject','') }}" placeholder="Поиск по теме">
+          </div>
+
+          <div class="field">
+            <label>Email</label>
+            <input class="input" type="text" name="email" value="{{ request.args.get('email','') }}" placeholder="user@domain.ru">
+          </div>
+
+          <div class="field">
+            <label>ИНН</label>
+            <input class="input" type="text" name="inn" value="{{ request.args.get('inn','') }}" placeholder="770...">
+          </div>
+
+          <div class="field">
+            <label>Статус</label>
+            <div class="ms" data-ms>
+              <button type="button" class="ms-trigger">Все</button>
+              <div class="ms-menu">
+                {% for st in STATUSES %}
+                  <label class="ms-opt">
+                    <input type="checkbox" name="status" value="{{ st }}" {% if st in request.args.getlist('status') %}checked{% endif %}>
+                    <span>{{ st }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Индикатор</label>
+            <div class="ms" data-ms>
+              <button type="button" class="ms-trigger">Все</button>
+              <div class="ms-menu">
+                <label class="ms-opt">
+                  <input type="checkbox" name="indicator" value="orange" {% if 'orange' in request.args.getlist('indicator') %}checked{% endif %}>
+                  <span>🟠 Клиент (я ответственный)</span>
+                </label>
+                <label class="ms-opt">
+                  <input type="checkbox" name="indicator" value="yellow" {% if 'yellow' in request.args.getlist('indicator') %}checked{% endif %}>
+                  <span>🟡 Клиент (я не ответственный)</span>
+                </label>
+                <label class="ms-opt">
+                  <input type="checkbox" name="indicator" value="green" {% if 'green' in request.args.getlist('indicator') %}checked{% endif %}>
+                  <span>🟢 Клиент (без ответственного)</span>
+                </label>
+                <label class="ms-opt">
+                  <input type="checkbox" name="indicator" value="blue" {% if 'blue' in request.args.getlist('indicator') %}checked{% endif %}>
+                  <span>🔵 Ответил оператор</span>
+                </label>
+                <label class="ms-opt">
+                  <input type="checkbox" name="indicator" value="black" {% if 'black' in request.args.getlist('indicator') %}checked{% endif %}>
+                  <span>⚫ Закрыто</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Отдел</label>
+            <div class="ms" data-ms>
+              <button type="button" class="ms-trigger">Все</button>
+              <div class="ms-menu">
+                {% for dep in DEPARTMENTS %}
+                  <label class="ms-opt">
+                    <input type="checkbox" name="department" value="{{ dep }}" {% if dep in request.args.getlist('department') %}checked{% endif %}>
+                    <span>{{ dep }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          {# Категорий и приоритетов больше нет: оставлена только отметка «Важная задача» внутри заявки. #}
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn btn-action-primary btn-sm" type="submit">
+            {{ svg('check','ico') }}Применить
+          </button>
+          <button class="btn btn-ghost btn-sm" type="button" id="clearFilters">
+            Очистить
+          </button>
+        </div>
+      </form>
+    {% else %}
+      <form id="filterForm" method="GET" class="filter-form">
+        <input type="hidden" name="show" value="{{ request.args.get('show', show or 10) }}">
+        <input type="hidden" name="sort" value="{{ request.args.get('sort', current_sort or 'created') }}">
+        <input type="hidden" name="dir" value="{{ request.args.get('dir', current_dir or 'desc') }}">
+        <div class="filter-grid">
+          <div class="field">
+            <label>ID</label>
+            <input class="input" type="text" name="id" value="{{ request.args.get('id','') }}" placeholder="123">
+          </div>
+
+          <div class="field field-wide">
+            <label>Тема</label>
+            <input class="input" type="text" name="subject" value="{{ request.args.get('subject','') }}" placeholder="Поиск по теме">
+          </div>
+
+          <div class="field">
+            <label>Статус</label>
+            <div class="ms" data-ms>
+              <button type="button" class="ms-trigger">Все</button>
+              <div class="ms-menu">
+                {% for st in STATUSES %}
+                  <label class="ms-opt">
+                    <input type="checkbox" name="status" value="{{ st }}" {% if st in request.args.getlist('status') %}checked{% endif %}>
+                    <span>{{ st }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn btn-action-primary btn-sm" type="submit">
+            {{ svg('check','ico') }}Применить
+          </button>
+          <button class="btn btn-ghost btn-sm" type="button" id="clearFilters">
+            Очистить
+          </button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div id="ticketListContainer" style="position:relative">
+  <div id="ticketListLoading" class="list-loading" aria-hidden="true">
+    <div class="spinner" aria-label="Загрузка"></div>
+  </div>
+  <div id="ticketsContent" data-compact="{{ 1 if compact else 0 }}">
+  {% include "partials/_ticket_list_content.html" %}
+</div>
+</div>
+
+{# Предпросмотр убран по требованиям #}
+
+<script src="{{ url_for('static', filename='js/multiselect.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ticket_list.js') }}"></script>
+
+{% endblock %}

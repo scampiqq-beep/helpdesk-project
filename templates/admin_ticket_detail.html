@@ -1,0 +1,380 @@
+<!-- templates/admin_ticket_detail.html -->
+{% extends "base.html" %}
+{% block title %}Заявка {{ ticket.id|ticket_id }} — {{ ticket.subject }}{% endblock %}
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<div class="page-container">
+  <div class="page-toolbar" style="margin-bottom:16px;">
+    <div class="page-title"><span>Заявка {{ ticket.id|ticket_id }}</span></div>
+    <div class="page-actions">
+      <a class="btn btn-action" href="{{ url_for('admin_automation_preview', ticket_id=ticket.id) }}">Проверка автоматизации</a>
+      {% if ticket.inn %}<a class="btn btn-action" href="{{ url_for('admin_organization_card', inn=ticket.inn) }}">Карточка организации</a>{% endif %}
+    </div>
+  </div>
+<style>
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+    .form-input, .form-textarea, .form-select {
+        width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+    }
+    .form-textarea { min-height: 100px; resize: vertical; }
+    .btn-save { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .btn-save:hover { background: #218838; }
+    .btn-cancel { background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 8px; }
+    .btn-cancel:hover { background: #5a6268; }
+    h2, h3 { margin-top: 0; margin-bottom: 15px; color: #2c3e50; }
+</style>
+
+<div class="ticket-edit-form" style="display: flex; gap: 20px; padding: 20px; flex-wrap: wrap;">
+
+    <!-- Левая панель -->
+    <div class="left-panel" style="flex: 0 0 50%; min-width: 350px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div class="form-group">
+            <label class="form-label">Тема:</label>
+            <input type="text" name="subject" class="form-input" value="{{ ticket.subject }}" readonly>
+        </div>
+        <div class="form-group">
+            <label class="form-label">От:</label>
+            <input type="text" name="email" class="form-input" value="{{ ticket.name }} ({{ ticket.email }})" readonly>
+        </div>
+        {% if ticket.organization or ticket.inn %}
+        <div class="form-group">
+            <label class="form-label">Данные организации:</label>
+            {% if ticket.organization %}
+                <div style="padding: 10px; background: #f8f9fa; border-radius: 6px; margin-bottom: 8px;">
+                    <strong>Организация:</strong><br>{{ ticket.organization }}
+                </div>
+            {% endif %}
+            {% if ticket.inn %}
+                <div style="padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                    <strong>ИНН:</strong><br>{{ ticket.inn }}
+                </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        <div class="form-group">
+            <label class="form-label">Описание:</label>
+            <textarea name="message" class="form-textarea" readonly>{{ ticket.message }}</textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Отдел:</label>
+            <select name="department" class="form-select">
+                {% for dept in DEPARTMENTS %}
+                    <option value="{{ dept }}" {% if dept == ticket.department %}selected{% endif %}>{{ dept }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Статус:</label>
+            <select name="status" class="form-select">
+                {% for status in STATUSES %}
+                    <option value="{{ status }}" {% if status == ticket.status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <!-- Пример в форме ответа -->
+        <div class="form-group">
+            <label>Шаблон ответа:</label>
+            <select id="responseTemplateSelect" onchange="applyResponseTemplate(this.value)">
+                <option value="">— Выберите шаблон —</option>
+                <!-- Загружается через JS -->
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Ответ:</label>
+            <textarea name="response" class="form-textarea">{{ ticket.response or '' }}</textarea>
+        </div>
+        <!-- Блок оценки "Помогло / Не помогло" -->
+{% if ticket.helpful is not none %}
+<div class="form-group" style="margin-top: 10px; padding: 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e0e6f0;">
+    <label class="form-label" style="margin-bottom: 8px; font-size: 13px; color: #2d3748;">Оценка клиента:</label>
+    {% if ticket.helpful %}
+        <span style="color: #166534; font-weight: 500;">✅ Ответ помог</span>
+    {% else %}
+        <span style="color: #dc2626; font-weight: 500;">❌ Ответ не помог</span>
+    {% endif %}
+</div>
+
+
+{% endif %}
+        <div class="form-group">
+            <label class="form-label">Служебный комментарий:</label>
+            <textarea name="internal_comment" class="form-textarea">{{ ticket.internal_comment or '' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Прикрепить файлы:</label><br>
+            <input type="file" id="fileInput" multiple accept=".png,.jpg,.jpeg,.gif,.pdf,.txt,.log,.zip">
+            <div id="fileList"></div>
+            <!-- <input type="hidden" id="fileNames" name="files" value=""> -->
+            <input type="hidden" id="fileNames" name="files" value="{{ ticket.files or '[]' }}">
+        </div>
+        <div class="form-group" style="margin-top: 20px;">
+            <button type="button" class="btn-save" onclick="saveTicket({{ ticket.id }})">Сохранить</button>
+            <button type="button" class="btn-cancel" onclick="location.href='{{ url_for('admin_support_list') }}'">Отмена</button>
+        </div>
+        <div class="form-group" style="margin-top: 10px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            {% if ticket.bitrix_task_id %}
+                <a href="https://corportal.ciktrb.ru/workgroups/group/82/tasks/task/view/{{ ticket.bitrix_task_id }}/" 
+                   target="_blank"
+                   class="btn" 
+                   style="background: #28a745; color: white; text-decoration: none; padding: 8px 16px; border-radius: 4px;">
+                    Открыть задачу
+                </a>
+                <span style="font-size: 0.9em; color: #495057;">
+                    Задача в Битрикс №{{ ticket.bitrix_task_id }}
+                </span>
+            {% else %}
+                <button type="button" class="btn" 
+                        style="background: #0d6efd; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;"
+                        onclick="createBitrixTask({{ ticket.id }})">
+                    Создать задачу в Bitrix
+                </button>
+            {% endif %}
+            <span id="bitrix-status" style="font-size: 0.9em; color: #666;"></span>
+            
+        </div>
+    </div>
+
+    <!-- Чат -->
+    <div class="middle-panel" style="flex: 0 0 25%; min-width: 300px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h3>Чат по заявке</h3>
+        <div class="chat-messages" style="max-height: 700px; overflow-y: auto; margin-bottom: 15px;"></div>
+        <form id="chatForm">
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <textarea class="form-textarea" name="message" placeholder="Введите сообщение..." required style="flex: 1; min-height: 60px; margin-bottom: 0;"></textarea>
+                <button type="submit" style="background: #007bff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap;">Отправить</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Правая панель: История изменений -->
+    <div class="right-panel" style="flex:0 0 22%; min-width: 250px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h3>История изменений</h3>
+        <div id="ticketHistory" style="max-height: 500px; overflow-y: auto;">
+            Загрузка...
+        </div>
+    </div>
+</div>
+
+<script>
+    const TICKET_ID = {{ ticket.id }};
+
+    function saveTicket(ticketId) {
+        const files = JSON.parse(document.getElementById('fileNames').value || '[]');
+        fetch('/update_ticket_full', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ticket_id: ticketId,
+                department: document.querySelector('select[name="department"]').value,
+                status: document.querySelector('select[name="status"]').value,
+                response: document.querySelector('textarea[name="response"]').value,
+                internal_comment: document.querySelector('textarea[name="internal_comment"]').value,
+                files: files
+            }),
+        }).then(r => r.json()).then(result => {
+            if (result.success) {
+                alert('Заявка сохранена!');
+                location.reload();
+            } else {
+                alert('Ошибка: ' + (result.error || 'неизвестно'));
+            }
+        }).catch(err => {
+            console.error('Ошибка:', err);
+            alert('Не удалось сохранить заявку');
+        });
+    }
+
+    function loadResponseTemplates(department) {
+        fetch(`/api/response_templates?department=${encodeURIComponent(department)}`)
+            .then(r => r.json())
+            .then(templates => {
+                const sel = document.getElementById('responseTemplateSelect');
+                sel.innerHTML = '<option value="">— Выберите шаблон —</option>';
+                templates.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = JSON.stringify({ body: t.body, files: t.files });
+                    opt.textContent = t.title;
+                    sel.appendChild(opt);
+                });
+            });
+    }
+
+    function applyResponseTemplate(value) {
+        if (!value) return;
+        const data = JSON.parse(value);
+        document.querySelector('textarea[name="response"]').value = data.body;
+        // Автоматически добавляем файлы в список
+        const currentFiles = JSON.parse(document.getElementById('fileNames').value || '[]');
+        const newFiles = [...new Set([...currentFiles, ...data.files])]; // Убираем дубли
+        document.getElementById('fileNames').value = JSON.stringify(newFiles);
+        updateFileList(); // Ваша существующая функция
+    }
+
+    function createBitrixTask(ticketId) {
+        const statusEl = document.getElementById('bitrix-status');
+        statusEl.textContent = 'Создание...';
+        statusEl.style.color = '#0d6efd';
+
+        fetch('/create_bitrix_task/' + ticketId, {
+            method: 'POST'
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                // Обновляем UI: заменяем кнопку на ссылку
+                const btnContainer = document.querySelector('.form-group > button')?.parentElement;
+                if (btnContainer) {
+                    // Получаем ID задачи из ответа (если он есть) или перезагружаем страницу
+                    // Проще всего — перезагрузить, чтобы отобразить ссылку
+                    location.reload();
+                }
+            } else {
+                statusEl.textContent = '❌ Ошибка: ' + (result.error || 'неизвестно');
+                statusEl.style.color = '#dc3545';
+            }
+        })
+        .catch(err => {
+            console.error('Ошибка Bitrix:', err);
+            statusEl.textContent = '❌ Не удалось создать задачу';
+            statusEl.style.color = '#dc3545';
+        });
+    }
+
+    function loadChatMessages() {
+        fetch(`/api/ticket/${TICKET_ID}/chat`)
+        .then(r => r.json())
+        .then(msgs => {
+            const box = document.querySelector('.chat-messages');
+            box.innerHTML = '';
+            msgs.forEach(m => {
+                const d = new Date(m.created_at);
+                const fmt = `${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+                box.innerHTML += `
+                    <div class="chat-message" style="padding:10px;margin-bottom:10px;background:#f8f9fa;border-radius:6px;border-left:3px solid ${m.is_operator ? '#28a745' : '#6c757d'};">
+                        <div style="display:flex;justify-content:space-between;font-size:0.85em;margin-bottom:4px;">
+                            <strong>${m.username}</strong><span>${fmt}</span>
+                        </div>
+                        <div>${m.message.replace(/\n/g, '<br>')}</div>
+                    </div>`;
+            });
+            box.scrollTop = box.scrollHeight;
+        });
+    }
+
+    document.getElementById('chatForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const msg = e.target.message.value.trim();
+        if (!msg) return;
+        fetch(`/api/ticket/${TICKET_ID}/chat`, {
+            method: 'POST',
+            body: JSON.stringify({ message: msg }),
+            headers: { 'Content-Type': 'application/json' }
+        }).then(r => r.json()).then(result => {
+            if (result.success) {
+                e.target.reset();
+                loadChatMessages();
+            } else {
+                alert('Ошибка отправки');
+            }
+        });
+    });
+    
+
+    document.addEventListener('DOMContentLoaded', loadChatMessages);
+    function loadHistory() {
+        fetch(`/api/ticket/${TICKET_ID}/history`)
+            .then(r => r.json())
+            .then(history => {
+                const div = document.getElementById('ticketHistory');
+                if (history.length === 0) {
+                    div.innerHTML = '<p style="color: #666;">Изменений пока нет.</p>';
+                    return;
+                }
+                let html = '';
+                history.forEach(h => {
+                    html += `
+                        <div class="history-item" style="padding: 10px; margin-bottom: 10px; background: #f8f9fa; border-radius: 6px; font-size: 0.9em;">
+                            <div style="font-weight: bold; color: #2c3e50;">${h.username}</div>
+                            <div style="color: #666; font-size: 0.85em;">${new Date(h.timestamp).toLocaleString('ru-RU')}</div>
+                            <div style="margin-top: 6px;">
+                                <strong>${h.field}:</strong><br>
+                                <span style="color: #666;">${h.old_value || '—'} → ${h.new_value || '—'}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                div.innerHTML = html;
+            })
+            .catch(err => {
+                console.error('Ошибка загрузки истории:', err);
+                document.getElementById('ticketHistory').innerHTML = '<p style="color: red;">Ошибка загрузки</p>';
+            });
+    }
+
+    // Вызываем после загрузки страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        loadChatMessages(TICKET_ID);
+        loadHistory();
+    });
+    // Загрузка файла
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const files = e.target.files;
+        const formData = new FormData();
+        for (let file of files) {
+            formData.append('file', file);
+        }
+        fetch('/upload_file', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const currentFiles = JSON.parse(document.getElementById('fileNames').value || '[]');
+                currentFiles.push(data.filename);
+                document.getElementById('fileNames').value = JSON.stringify(currentFiles);
+                updateFileList();
+            } else {
+                alert('Ошибка загрузки: ' + (data.error || 'неизвестно'));
+            }
+        });
+    });
+
+    // Удаление файла
+    function removeFile(filename) {
+        const files = JSON.parse(document.getElementById('fileNames').value || '[]');
+        const updated = files.filter(f => f !== filename);
+        document.getElementById('fileNames').value = JSON.stringify(updated);
+        updateFileList();
+    }
+
+    // Обновление списка файлов
+    function updateFileList() {
+        const files = JSON.parse(document.getElementById('fileNames').value || '[]');
+        const list = document.getElementById('fileList');
+        list.innerHTML = '';
+        files.forEach(name => {
+            list.innerHTML += `
+                <div style="margin: 4px 0;">
+                    <a href="/uploads/${encodeURIComponent(name)}" target="_blank">${name}</a>
+                    <button type="button" onclick="removeFile('${name}')" style="margin-left: 8px; font-size: 0.8em;">×</button>
+                </div>
+            `;
+        });
+    }
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        updateFileList();
+        loadChatMessages(TICKET_ID);
+        loadHistory();
+        // ✅ Загружаем шаблоны ответа
+        const currentDept = document.querySelector('select[name="department"]').value;
+        loadResponseTemplates(currentDept);
+    });
+    
+</script>
+</div>
+  </section>
+</div>
+{% endblock %}

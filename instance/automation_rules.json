@@ -1,0 +1,44 @@
+[
+  {
+    "key": "vip-high-priority",
+    "name": "VIP → высокий приоритет",
+    "enabled": false,
+    "priority": 10,
+    "stop_on_match": false,
+    "conditions": [
+      {
+        "type": "customer_type_equals",
+        "value": "VIP"
+      }
+    ],
+    "actions": [
+      {
+        "type": "set_priority",
+        "value": "Высокий"
+      },
+      {
+        "type": "set_critical",
+        "value": true
+      }
+    ]
+  },
+  {
+    "key": "sla-breach-note",
+    "name": "SLA breach → внутренняя заметка",
+    "enabled": true,
+    "priority": 90,
+    "stop_on_match": false,
+    "conditions": [
+      {
+        "type": "sla_breached",
+        "value": true
+      }
+    ],
+    "actions": [
+      {
+        "type": "add_internal_note",
+        "value": "SLA нарушен, нужна эскалация"
+      }
+    ]
+  }
+]

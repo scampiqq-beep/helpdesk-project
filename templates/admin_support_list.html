@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Техническая поддержка — Список заявок{% endblock %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-toolbar" style="margin-bottom:16px;">
+    <div class="page-title"><span>Техническая поддержка</span></div>
+  </div>
+
+<!-- Панель поиска и фильтров в стиле доски задач -->
+<div class="controls-bar">
+    <div class="control-group">
+        <label for="filterId">ID обращения</label>
+        <input type="text" id="filterId" placeholder="Введите ID">
+    </div>
+    <div class="control-group">
+        <label for="filterSubject">Тема</label>
+        <input type="text" id="filterSubject" placeholder="Введите тему">
+    </div>
+    <div class="control-group">
+        <label for="filterStatus">Статус</label>
+        <select id="filterStatus">
+            <option value="">Все</option>
+            {% for status in STATUSES %}
+                <option value="{{ status }}">{{ status }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="control-group">
+        <label for="filterDepartment">Отдел</label>
+        <select id="filterDepartment">
+            <option value="">Все</option>
+            {% for dept in DEPARTMENTS %}
+                <option value="{{ dept }}">{{ dept }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="control-group actions">
+        <button onclick="applyFilter()" class="btn apply-btn">Применить</button>
+        <button onclick="resetFilters()" class="btn reset-btn">Сбросить</button>
+    </div>
+</div>
+
+<table class="support-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Дата создания</th>
+            <th>Заголовок</th>
+            <th>Организация / ИНН</th>
+            <th>Автор</th>
+            <th>Изменено</th>
+            <th>Отдел</th>
+            <th>Ответственный</th>
+            <th>Срочность ответа</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ticket in tickets %}
+        <tr>
+            <td class="ticket-id">{{ ticket.id|ticket_id }}</td>
+            <td class="small-text">{{ ticket.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td><a href="/admin/ticket/{{ ticket.id }}" class="ticket-title-link">{{ ticket.subject }}</a></td>
+            <td class="org-inn-cell">
+                {% if ticket.organization %}<div class="org-name">{{ ticket.organization }}</div>{% endif %}
+                {% if ticket.inn %}<div class="inn-number">ИНН: {{ ticket.inn }}</div>{% endif %}
+            </td>
+            <td class="small-text">
+                {% if ticket.client_rel %}
+                    {{ ticket.client_rel.username or ticket.client_rel.email }}
+                {% else %}
+                    {{ ticket.name }} ({{ ticket.email }})
+                {% endif %}
+            </td>
+            <td class="small-text">{{ ticket.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td class="small-text">{{ ticket.department }}</td>
+            <td class="operator-cell small-text">
+                {% if ticket.locked_by %}
+                    {% set operator = ticket.operator %}
+                    {% if operator %}
+                        <span class="operator-name">{{ operator.username }}</span>
+                    {% else %}
+                        <span class="unknown-operator">Неизвестный</span>
+                    {% endif %}
+                {% else %}
+                    <span class="no-operator">Не назначен</span>
+                {% endif %}
+            </td>
+            <td class="sla-cell small-text">
+                {% if ticket.sla_info %}
+                    <span class="sla-badge {{ ticket.sla_class }}">{{ ticket.sla_info }}</span>
+                {% else %}
+                    <span class="no-sla">—</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+    function applyFilter() {
+        const id = document.getElementById('filterId').value.trim().toLowerCase();
+        const subject = document.getElementById('filterSubject').value.trim().toLowerCase();
+        const status = document.getElementById('filterStatus').value;
+        const department = document.getElementById('filterDepartment').value;
+
+        const rows = document.querySelectorAll('.support-table tbody tr');
+        rows.forEach(row => {
+            const rowId = row.cells[0].innerText.toLowerCase();
+            const rowSubject = row.cells[2].innerText.toLowerCase();
+            const rowStatus = row.cells[6].dataset.status;
+            const rowDept = row.cells[6].innerText;
+
+            let show = true;
+            if (id && !rowId.includes(id)) show = false;
+            if (subject && !rowSubject.includes(subject)) show = false;
+            if (status && rowStatus !== status) show = false;
+            if (department && rowDept !== department) show = false;
+
+            row.style.display = show ? '' : 'none';
+        });
+    }
+    
+    function resetFilters() {
+        document.getElementById('filterId').value = '';
+        document.getElementById('filterSubject').value = '';
+        document.getElementById('filterStatus').value = '';
+        document.getElementById('filterDepartment').value = '';
+        applyFilter();
+    }
+</script>
+</div>
+{% endblock %}

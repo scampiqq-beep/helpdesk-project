@@ -1,0 +1,792 @@
+<!-- templates/admin_stats.html -->
+{% extends "base.html" %}
+{% block title %}Статистика | Техподдержка{% endblock %}
+{% block page_title %}<i class="bi bi-bar-chart-line me-2"></i>Статистика и аналитика{% endblock %}
+
+{% block content %}
+<style>
+    /* ========== КОМПАКТНЫЙ ДИЗАЙН ========== */
+    .stats-container {
+        width: 100%;
+        padding: 0 15px;
+        margin: 0 auto;
+    }
+    
+    /* Карточки */
+    .compact-card {
+        background: #f8f9fa;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        height: 100%;
+        transition: all 0.2s;
+        border: 1px solid #e0e0e0;
+        margin-bottom: 15px;
+    }
+    
+    .compact-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        border-color: #d0d0d0;
+    }
+    
+    /* Текст */
+    .metric-header {
+        font-size: 12px;
+        color: #555;
+        font-weight: 600;
+        margin-bottom: 4px;
+        letter-spacing: 0.2px;
+        text-transform: uppercase;
+    }
+    
+    .metric-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #2c3e50;
+        margin: 6px 0;
+        line-height: 1.2;
+    }
+    
+    .metric-subvalue {
+        font-size: 12px;
+        color: #777;
+    }
+    
+    /* Цвета трендов */
+    .trend-positive { color: #28a745; font-weight: 600; }
+    .trend-negative { color: #dc3545; font-weight: 600; }
+    .trend-neutral { color: #6c757d; font-weight: 600; }
+    
+    /* Фильтры */
+    .filter-card {
+        background: #f5f5f5;
+        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+    }
+    
+    .filter-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #444;
+        margin-bottom: 2px;
+    }
+    
+    .filter-badge {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #c8e6c9;
+        font-size: 12px;
+        padding: 4px 10px;
+    }
+    
+    /* Кнопки (серые) */
+    .btn {
+        background-color: #e0e0e0;
+        border-color: #c0c0c0;
+        color: #333;
+        font-size: 13px;
+        padding: 6px 12px;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+    
+    .btn:hover {
+        background-color: #d0d0d0;
+        border-color: #a0a0a0;
+        transform: translateY(-1px);
+    }
+    
+    .btn-primary {
+        background-color: #2e7d32;
+        border-color: #1b5e20;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background-color: #1b5e20;
+        border-color: #083a0f;
+    }
+    
+    .btn-outline-secondary {
+        background-color: transparent;
+        border-color: #c0c0c0;
+        color: #555;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #f0f0f0;
+        border-color: #a0a0a0;
+    }
+    
+    /* Приоритеты (цветовые индикаторы) */
+    .priority-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    
+    .priority-high {
+        background-color: #ffcdd2;
+        border: 2px solid #f44336;
+    }
+    
+    .priority-medium {
+        background-color: #fff9c4;
+        border: 2px solid #ffc107;
+    }
+    
+    .priority-low {
+        background-color: #c8e6c9;
+        border: 2px solid #4caf50;
+    }
+    
+    /* Графики */
+    .chart-container {
+        position: relative;
+        height: 180px;
+        margin-top: 10px;
+    }
+    
+    /* Статусы (пастельные цвета) */
+    .status-new { background-color: #cce5ff; color: #004085; border-left: 3px solid #007bff; }
+    .status-in-progress { background-color: #ffe0b2; color: #5a3a00; border-left: 3px solid #ff9800; }
+    .status-resolved { background-color: #d4edda; color: #155724; border-left: 3px solid #28a745; }
+    
+    /* Быстрые действия */
+    .quick-actions {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 15px;
+        border: 1px solid #ddd;
+    }
+    
+    .quick-actions .btn {
+        margin-right: 8px;
+        font-size: 12px;
+        padding: 5px 10px;
+    }
+    
+    /* Стили для печати */
+    @media print {
+        body {
+            background: white;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .filter-card,
+        .quick-actions,
+        .btn,
+        nav,
+        footer {
+            display: none !important;
+        }
+        
+        .compact-card {
+            box-shadow: none;
+            border: 1px solid #ddd;
+            page-break-inside: avoid;
+            margin-bottom: 20px;
+        }
+        
+        .chart-container {
+            height: 200px !important;
+        }
+        
+        .stats-container {
+            padding: 10px;
+        }
+        
+        .metric-header {
+            font-size: 10px;
+        }
+        
+        .metric-value {
+            font-size: 16px;
+        }
+    }
+    
+    /* Адаптивность */
+    @media (max-width: 768px) {
+        .stats-container {
+            padding: 0 10px;
+        }
+        
+        .metric-value {
+            font-size: 18px;
+        }
+        
+        .chart-container {
+            height: 150px;
+        }
+    }
+    
+    /* Сообщение о пустых данных */
+    .no-data-message {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #666;
+        font-size: 13px;
+        text-align: center;
+        padding: 15px;
+    }
+    .no-data-message i {
+        font-size: 28px;
+        margin-bottom: 8px;
+        color: #aaa;
+    }
+    .debug-info {
+        background: #e8f5e9;
+        border-left: 3px solid #2e7d32;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-size: 11px;
+        display: none;
+    }
+</style>
+
+<div class="stats-container">
+    <!-- ========== ФИЛЬТРЫ ========== -->
+    <div class="filter-card">
+        <form method="GET" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <label class="filter-label">Период:</label>
+            </div>
+            <div class="col-auto">
+                <select name="period" class="form-select form-select-sm" id="period-select" style="width: 110px; font-size: 12px; padding: 4px 8px;">
+                    <option value="1" {% if period == '1' %}selected{% endif %}>Сегодня</option>
+                    <option value="7" {% if period == '7' %}selected{% endif %}>7 дней</option>
+                    <option value="30" {% if period == '30' or not period %}selected{% endif %}>30 дней</option>
+                    <option value="90" {% if period == '90' %}selected{% endif %}>90 дней</option>
+                    <option value="custom" {% if period == 'custom' %}selected{% endif %}>Произвольный</option>
+                </select>
+            </div>
+            
+            <!-- Дата от/до (только для custom) -->
+            <div class="col-auto date-field" id="date-from-field" style="display: {% if period == 'custom' %}block{% else %}none{% endif %};">
+                <input type="date" name="date_from" value="{{ date_from }}" 
+                       class="form-control form-control-sm" style="width: 120px; font-size: 12px; padding: 4px 8px;">
+            </div>
+            <div class="col-auto date-field" id="date-to-field" style="display: {% if period == 'custom' %}block{% else %}none{% endif %};">
+                <input type="date" name="date_to" value="{{ date_to }}" 
+                       class="form-control form-control-sm" style="width: 120px; font-size: 12px; padding: 4px 8px;">
+            </div>
+
+            <div class="col-auto">
+                <label class="filter-label">Отдел:</label>
+            </div>
+            <div class="col-auto">
+                <select name="department_id" class="form-select form-select-sm" style="width: 160px; font-size: 12px; padding: 4px 8px;">
+                    <option value="">Все отделы</option>
+                    {% for dept in all_departments %}
+                    <option value="{{ dept.id }}" {% if department_id == dept.id %}selected{% endif %}>
+                        {{ dept.name|truncate(22) }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-auto ms-auto">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-check-lg me-1"></i>Применить
+                </button>
+                <a href="{{ url_for('admin_stats') }}" class="btn btn-outline-secondary btn-sm ms-2">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Сбросить
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- ========== ИНФО БАДЖИ ========== -->
+    {% if period or department_id %}
+    <div class="mb-3">
+        <span class="filter-badge">
+            <i class="bi bi-funnel me-1"></i>Фильтры:
+        </span>
+        {% if period == '1' %}<span class="badge bg-light text-dark me-1" style="font-size: 11px;">Сегодня</span>{% endif %}
+        {% if period == '7' %}<span class="badge bg-light text-dark me-1" style="font-size: 11px;">7 дней</span>{% endif %}
+        {% if period == '30' %}<span class="badge bg-light text-dark me-1" style="font-size: 11px;">30 дней</span>{% endif %}
+        {% if period == '90' %}<span class="badge bg-light text-dark me-1" style="font-size: 11px;">90 дней</span>{% endif %}
+        {% if period == 'custom' %}<span class="badge bg-light text-dark me-1" style="font-size: 11px;">Произвольный</span>{% endif %}
+        {% if department_id %}
+            {% for dept in all_departments if dept.id == department_id %}
+            <span class="badge bg-light text-dark me-1" style="font-size: 11px;">{{ dept.name|truncate(15) }}</span>
+            {% endfor %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ========== ОСНОВНЫЕ МЕТРИКИ 3x3 ========== -->
+    <div class="row g-3 mb-3">
+        <!-- Блок 1: Всего заявок -->
+        <div class="col-md-4">
+            <div class="compact-card p-3">
+                <div class="metric-header">Всего заявок (NST)</div>
+                <div class="metric-value">{{ stats.total }}</div>
+                
+                <div class="mt-2">
+                    {% set new_count = stats.total - stats.resolved - stats.in_progress %}
+                    {% if new_count < 0 %}{% set new_count = 0 %}{% endif %}
+                    
+                    <div class="d-flex align-items-center mb-2" style="font-size: 12px;">
+                        <span class="priority-low me-2"></span>
+                        <div class="flex-grow-1">Новые</div>
+                        <div class="fw-bold">{{ new_count }}</div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center mb-2" style="font-size: 12px;">
+                        <span class="priority-medium me-2"></span>
+                        <div class="flex-grow-1">Приняты</div>
+                        <div class="fw-bold">{{ stats.in_progress }}</div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center" style="font-size: 12px;">
+                        <span class="priority-high me-2"></span>
+                        <div class="flex-grow-1">Завершены</div>
+                        <div class="fw-bold">{{ stats.resolved }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+      <!-- ========== БЛОК 2: СОБЛЮДЕНИЕ SLA ========== -->
+<div class="col-md-4">
+    <div class="compact-card p-3">
+        <div class="metric-header">Соблюдение SLA</div>
+
+        {% set total_completed = sla_metrics.on_time + sla_metrics.overdue_completed %}
+        {% set total_overdue_active = sla_metrics.overdue_active %}
+        
+        {% set sla_compliance = 0 %}
+        {% if total_completed > 0 %}
+            {% set sla_compliance = (sla_metrics.on_time / total_completed * 100) %}
+        {% endif %}
+        
+        <div class="metric-value">
+            {% if total_completed > 0 %}
+                {{ "%.1f"|format(sla_compliance) }}%
+            {% else %}
+                0%
+            {% endif %}
+        </div>
+
+        <div class="mt-2">
+            <div class="d-flex justify-content-between small mb-1">
+                <span><i class="bi bi-check-circle-fill text-success me-1"></i>Выполнено в срок:</span>
+                <span class="fw-bold text-success">{{ sla_metrics.on_time }}</span>
+            </div>
+            <div class="d-flex justify-content-between small mb-1">
+                <span><i class="bi bi-clock-history text-warning me-1"></i>Просрочено выполнено:</span>
+                <span class="fw-bold text-warning">{{ sla_metrics.overdue_completed }}</span>
+            </div>
+            <div class="d-flex justify-content-between small mb-1">
+                <span><i class="bi bi-alarm-fill text-danger me-1"></i>Активные просроченные:</span>
+                <span class="fw-bold text-danger">{{ total_overdue_active }}</span>
+            </div>
+            <div class="d-flex justify-content-between small">
+                <span><i class="bi bi-bar-chart me-1"></i>Всего завершено:</span>
+                <span class="fw-bold">{{ total_completed }}</span>
+            </div>
+        </div>
+
+        <div class="mt-2">
+            {% if total_completed > 0 or total_overdue_active > 0 %}
+                <div class="progress" style="height: 6px; border-radius: 3px; background-color: #e9ecef;">
+                    {% if total_completed > 0 %}
+                    <div class="progress-bar bg-success" 
+                         style="width: {{ (sla_metrics.on_time / (total_completed + total_overdue_active) * 100) if (total_completed + total_overdue_active) > 0 else 0 }}%"
+                         title="Выполнено в срок">
+                    </div>
+                    <div class="progress-bar bg-warning" 
+                         style="width: {{ (sla_metrics.overdue_completed / (total_completed + total_overdue_active) * 100) if (total_completed + total_overdue_active) > 0 else 0 }}%"
+                         title="Просрочено выполнено">
+                    </div>
+                    {% endif %}
+                    {% if total_overdue_active > 0 %}
+                    <div class="progress-bar bg-danger" 
+                         style="width: {{ (total_overdue_active / (total_completed + total_overdue_active) * 100) if (total_completed + total_overdue_active) > 0 else 0 }}%"
+                         title="Активные просроченные">
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if sla_metrics.avg_time_to_resolve %}
+                <div class="d-flex justify-content-between small text-muted mt-1">
+                    <span>Среднее время решения:</span>
+                    <span class="fw-bold">{{ sla_metrics.avg_time_to_resolve }}</span>
+                </div>
+                {% endif %}
+                
+                <div class="d-flex justify-content-between small text-muted mt-1">
+                    <span>Всего контролируемых заявок:</span>
+                    <span class="fw-bold">{{ total_completed + total_overdue_active }}</span>
+                </div>
+            {% else %}
+                <div class="alert alert-info small py-1 mb-0" style="font-size: 11px;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Нет заявок с контролем SLA
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+        <!-- Блок 3: Новые сегодня -->
+        <div class="col-md-4">
+            <div class="compact-card p-3">
+                <div class="metric-header">Новые заявки сегодня</div>
+                <div class="metric-value">{{ stats.new_today or 0 }}</div>
+                <div class="metric-subvalue mt-1">
+                    {% if stats.new_today and stats.new_today > 0 %}
+                    <a href="{{ url_for('ticket_list', status='Новая') }}" class="text-decoration-none text-primary" style="font-size: 12px;">
+                        <i class="bi bi-eye me-1"></i>Просмотреть
+                    </a>
+                    {% else %}
+                    <span style="font-size: 12px;">Новых заявок нет</span>
+                    {% endif %}
+                </div>
+                <div class="mt-2">
+                    <span class="badge bg-light text-dark me-1" style="font-size: 11px;">Сегодня</span>
+                    <span class="badge bg-light text-dark" style="font-size: 11px;">
+                        <i class="bi bi-clock me-1"></i>{{ now.strftime('%H:%M') if now else '' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== ГРАФИКИ ========== -->
+    <div class="row g-3 mb-3">
+        <!-- Динамика заявок -->
+        <div class="col-md-6">
+            <div class="compact-card p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="metric-header">Динамика поступления</div>
+                    <div class="text-muted small">за 7 дней</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="dailyTicketsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Статусы заявок -->
+        <div class="col-md-6">
+            <div class="compact-card p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="metric-header">Статусы заявок</div>
+                    <div class="text-muted small">всего: {{ stats.total }}</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== РАСПРЕДЕЛЕНИЕ ПО ОТДЕЛАМ ========== -->
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="compact-card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="metric-header">Распределение по отделам</div>
+                <div class="text-muted small">
+                    Всего: {{ stats.total }} заявок
+                </div>
+            </div>
+            <div style="height: 250px; margin-top: 15px;">
+                <canvas id="departmentChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- ========== БЫСТРЫЕ ДЕЙСТВИЯ ========== -->
+    <div class="quick-actions">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="small text-muted">
+                <i class="bi bi-clock me-1"></i>
+                Обновлено: {{ now.strftime('%d.%m.%Y %H:%M') if now else '' }}
+            </div>
+            <div>
+                <button id="printBtn" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-printer me-1"></i>Печать
+                </button>
+                <a href="{{ url_for('admin_reports') }}" class="btn btn-sm ms-2">
+                    <i class="bi bi-file-earmark-text me-1"></i>Отчёт
+                </a>
+                <a href="{{ url_for('ticket_list') }}" class="btn btn-sm ms-2">
+                    <i class="bi bi-list-task me-1"></i>Заявки
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Страница загружена');
+    
+    // ========== ПЕРЕКЛЮЧЕНИЕ ПОЛЕЙ ДАТ ==========
+    const periodSelect = document.getElementById('period-select');
+    const dateFields = document.querySelectorAll('.date-field');
+
+    periodSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            dateFields.forEach(el => el.style.display = 'block');
+        } else {
+            dateFields.forEach(el => el.style.display = 'none');
+        }
+    });
+
+    // ========== ЦВЕТА ДЛЯ ГРАФИКОВ ==========
+    const chartColors = {
+        primary: '#007bff',
+        success: '#28a745',
+        warning: '#ff9800',
+        danger: '#f44336',
+        info: '#17a2b8',
+        secondary: '#6c757d',
+        primaryLight: 'rgba(0, 123, 255, 0.2)',
+        successLight: 'rgba(40, 167, 69, 0.2)',
+        warningLight: 'rgba(255, 152, 0, 0.2)',
+        dangerLight: 'rgba(244, 67, 54, 0.2)',
+        infoLight: 'rgba(23, 162, 184, 0.2)'
+    };
+
+    // ========== ВАШИ ПАСТЕЛЬНЫЕ ЦВЕТА СТАТУСОВ ==========
+    const statusColors = {
+        'Новая': {
+            color: '#004085',
+            background: 'rgba(204, 229, 255, 0.7)',
+            border: '#007bff'
+        },
+        'Принята': {
+            color: '#5a3a00',
+            background: 'rgba(255, 224, 178, 0.7)',
+            border: '#ff9800'
+        },
+        'Завершена': {
+            color: '#155724',
+            background: 'rgba(212, 237, 218, 0.7)',
+            border: '#28a745'
+        },
+        'default': {
+            color: '#495057',
+            background: 'rgba(233, 236, 239, 0.7)',
+            border: '#6c757d'
+        }
+    };
+
+    // ========== ПРОВЕРКА ЭЛЕМЕНТОВ ХОЛСТА ==========
+    const dailyCanvas = document.getElementById('dailyTicketsChart');
+    const statusCanvas = document.getElementById('statusChart');
+    const deptCanvas = document.getElementById('departmentChart');
+    
+    if (!dailyCanvas || !statusCanvas || !deptCanvas) {
+        console.error('Не найдены элементы холста');
+        return;
+    }
+
+    // ========== ЗАГРУЗКА ДАННЫХ ДЛЯ ГРАФИКОВ ==========
+    fetch('/api/charts/data')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Ошибка сети: ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Данные получены:', data);
+            console.log('SLA метрики:', data.sla_metrics);
+            
+            // 1. ДИНАМИКА ЗАЯВОК ЗА 7 ДНЕЙ
+            const dailyCtx = dailyCanvas.getContext('2d');
+            console.log('Инициализация графика динамики');
+            
+            new Chart(dailyCtx, {
+                type: 'line',
+                data: {  // ← КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: добавлено "data:"
+                    labels: data.tickets_by_day?.labels || [],
+                    datasets: [{
+                        label: 'Новых заявок',
+                        data: data.tickets_by_day?.data || [],  // ← и здесь "data:"
+                        borderColor: chartColors.primary,
+                        backgroundColor: chartColors.primaryLight,
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    }]
+                },
+                options: {  // ← и "options:"
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { 
+                            grid: { display: false },
+                            ticks: { font: { size: 10 } }
+                        },
+                        y: { 
+                            beginAtZero: true,
+                            grid: { color: '#f0f0f0' },
+                            ticks: { font: { size: 10 }, precision: 0 }
+                        }
+                    }
+                }
+            });
+
+            // 2. СТАТУСЫ ЗАЯВОК
+            const statusLabels = data.status_pie?.labels || [];
+            const statusData = data.status_pie?.data || [];
+            const total = statusData.reduce((a, b) => a + b, 0);
+
+            const statusCtx = statusCanvas.getContext('2d');
+            console.log('Инициализация графика статусов');
+            
+            new Chart(statusCtx, {
+                type: 'pie',
+                data: {  // ← КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
+                    labels: statusLabels.map((label, i) => {
+                        const count = statusData[i] || 0;
+                        const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+                        return `${label}: ${count} (${percent}%)`;
+                    }),
+                    datasets: [{
+                        data: statusData,  // ← и здесь "data:"
+                        backgroundColor: statusLabels.map(label => {
+                            const color = statusColors[label] || statusColors.default;
+                            return color.background;
+                        }),
+                        borderColor: statusLabels.map(label => {
+                            const color = statusColors[label] || statusColors.default;
+                            return color.border;
+                        }),
+                        borderWidth: 2
+                    }]
+                },
+                options: {  // ← и "options:"
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'right',
+                            labels: { 
+                                font: { size: 10 },
+                                usePointStyle: true,
+                                padding: 8
+                            }
+                        }
+                    }
+                }
+            });
+
+// 3. РАСПРЕДЕЛЕНИЕ ПО ОТДЕЛАМ - ОБНОВЛЕННАЯ ВЕРСИЯ
+const deptCtx = deptCanvas.getContext('2d');
+console.log('Инициализация графика отделов');
+console.log('Данные отделов:', data.department_bar);
+
+let deptLabels = [];
+let deptData = [];
+
+if (data.department_bar && Array.isArray(data.department_bar.labels) && Array.isArray(data.department_bar.data)) {
+    // Фильтруем отделы, где есть заявки (> 0)
+    const filteredLabels = [];
+    const filteredData = [];
+    
+    data.department_bar.labels.forEach((label, index) => {
+        const value = Number(data.department_bar.data[index]) || 0;
+        if (value > 0) {
+            filteredLabels.push(label);
+            filteredData.push(value);
+        }
+    });
+    
+    deptLabels = filteredLabels;
+    deptData = filteredData;
+    
+    console.log('Отфильтрованные отделы:', deptLabels);
+    console.log('Отфильтрованные данные:', deptData);
+}
+
+if (deptLabels.length === 0) {
+    deptLabels = ['Нет данных'];
+    deptData = [0];
+}
+
+const colors = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac'];
+
+new Chart(deptCtx, {
+    type: 'bar',
+    data: {
+        labels: deptLabels,
+        datasets: [{
+            label: 'Заявок',
+            data: deptData,
+            backgroundColor: deptLabels.map((_, i) => colors[i % colors.length] + '80'),
+            borderColor: deptLabels.map((_, i) => colors[i % colors.length]),
+            borderWidth: 1,
+            borderRadius: 3
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = total > 0 ? Math.round((context.raw / total) * 100) : 0;
+                        return `${context.raw} заявок (${percentage}%)`;
+                    }
+                }
+            }
+        },
+        scales: {
+            x: { 
+                beginAtZero: true, 
+                grid: { color: '#f0f0f0' }, 
+                ticks: { font: { size: 10 } } 
+            },
+            y: { 
+                grid: { display: false }, 
+                ticks: { font: { size: 11 } } 
+            }
+        },
+        animation: false
+    }
+});
+            
+            console.log('Все графики инициализированы');
+        })
+        .catch(error => {
+            console.error('Ошибка загрузки графиков:', error);
+            alert('Ошибка загрузки данных: ' + error.message);
+        });
+
+    // ========== ПЕЧАТЬ ==========
+    document.getElementById('printBtn').addEventListener('click', function() {
+        window.print();
+    });
+});
+</script>
+{% endblock %}

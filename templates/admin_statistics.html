@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Статистика{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics.css') }}">
+{% endblock %}
+
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<div class="page-container">
+
+  <div class="page-toolbar">
+    <div class="page-title">
+      <i class="bi bi-speedometer2"></i>
+      <span>Статистика</span>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-action" href="{{ url_for('admin_reports', period=period, department_id=department_id or '', operator_id=operator_id or '', date_from=date_from, date_to=date_to) }}">
+        <i class="bi bi-clipboard-data"></i> Отчёты
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-funnel"></i> Фильтры</div>
+    <div class="card-body">
+      <form method="get">
+        <div class="filters-grid">
+          <div>
+            <label class="form-label">Период</label>
+            <select class="form-select" name="period" id="periodSelect">
+              <option value="7"  {% if period == '7' %}selected{% endif %}>7 дней</option>
+              <option value="30" {% if period == '30' %}selected{% endif %}>30 дней</option>
+              <option value="90" {% if period == '90' %}selected{% endif %}>90 дней</option>
+              <option value="365" {% if period == '365' %}selected{% endif %}>365 дней</option>
+              <option value="custom" {% if period == 'custom' %}selected{% endif %}>Свой период</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Отдел</label>
+            <select class="form-select" name="department_id">
+              <option value="">Все отделы</option>
+              {% for d in all_departments %}
+                <option value="{{ d.id }}" {% if department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Оператор</label>
+            <select class="form-select" name="operator_id">
+              <option value="">Все</option>
+              {% for u in operators %}
+                <option value="{{ u.id }}" {% if operator_id == u.id %}selected{% endif %}>{{ u.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Дата от</label>
+            <input class="form-control" type="date" name="date_from" id="dateFrom" value="{{ date_from }}">
+          </div>
+
+          <div>
+            <label class="form-label">Дата до</label>
+            <input class="form-control" type="date" name="date_to" id="dateTo" value="{{ date_to }}">
+          </div>
+
+          <div style="display:flex;gap:10px;justify-content:flex-end;align-items:flex-end">
+            <button class="btn btn-action-primary" type="submit"><i class="bi bi-check2"></i> Применить</button>
+            <a class="btn btn-action" href="{{ url_for('admin_statistics') }}"><i class="bi bi-arrow-clockwise"></i> Сброс</a>
+          </div>
+        </div>
+        <div style="margin-top:10px;color:var(--muted);font-size:.86rem">
+          Период: <strong>{{ period_label }}</strong>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">Создано</div>
+          <div class="metric-value">{{ sla_metrics.created_count }}</div>
+        </div>
+        <div class="metric-ico"><i class="bi bi-plus-circle"></i></div>
+      </div>
+      <div class="metric-sub">Net flow: <strong>{{ sla_metrics.net_flow }}</strong></div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">Закрыто</div>
+          <div class="metric-value">{{ sla_metrics.resolved_count }}</div>
+        </div>
+        <div class="metric-ico success"><i class="bi bi-check2-circle"></i></div>
+      </div>
+      <div class="metric-sub">Очередь (конец): <strong>{{ sla_metrics.backlog_end }}</strong></div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">Сроки (SLA) — закрытые</div>
+          <div class="metric-value">{{ sla_compliance_percent }}%</div>
+        </div>
+        <div class="metric-ico info"><i class="bi bi-shield-check"></i></div>
+      </div>
+      <div class="metric-sub">SLA решения: {{ sla_metrics.on_time }} · Просрочено: {{ sla_metrics.overdue_completed }}{% if sla_v2 %} · Первый ответ: {{ sla_v2.first_response_percent }}%{% endif %}</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">FRT / Resolve</div>
+          <div class="metric-value">{{ sla_metrics.frt_avg }}</div>
+        </div>
+        <div class="metric-ico"><i class="bi bi-chat-left-dots"></i></div>
+      </div>
+      <div class="metric-sub">Среднее время решения (MTTR): <strong>{{ sla_metrics.avg_time_to_resolve }}</strong></div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">Открыто сейчас</div>
+          <div class="metric-value">{{ in_progress }}</div>
+        </div>
+        <div class="metric-ico"><i class="bi bi-inboxes"></i></div>
+      </div>
+      <div class="metric-sub">Просрочено сейчас: <strong>{{ overdue_active }}</strong></div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">База знаний</div>
+          <div class="metric-value">{{ kb_published }}/{{ kb_total }}</div>
+        </div>
+        <div class="metric-ico"><i class="bi bi-journal-text"></i></div>
+      </div>
+      <div class="metric-sub">Избранное: <strong>{{ kb_favs }}</strong></div>
+    </div>
+  </div>
+
+  <div class="analytics-grid">
+    <div class="card">
+      <div class="card-header">Поток заявок (Создано vs закрыто)</div>
+      <div class="card-body">
+        <div class="canvas-wrap"><canvas id="flowChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">SLA по приоритетам (закрытые)</div>
+      <div class="card-body">
+        <div class="canvas-wrap"><canvas id="slaChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="analytics-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-header">Шаг 9 · Аналитика по клиентам</div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-responsive reports-table-wrap">
+          <table class="table table-hover table-compact reports-table">
+            <thead><tr><th>Организация</th><th>ИНН</th><th>Всего</th><th>Открыто</th><th>Просрочено</th></tr></thead>
+            <tbody>
+              {% for row in step9.top_clients %}
+                <tr>
+                  <td>{{ row.name }}</td>
+                  <td>{{ row.inn or '—' }}</td>
+                  <td>{{ row.tickets }}</td>
+                  <td>{{ row.open }}</td>
+                  <td>{{ row.overdue }}</td>
+                </tr>
+              {% endfor %}
+              {% if not step9.top_clients %}<tr><td colspan="5" style="padding:18px;color:var(--muted)">Нет данных.</td></tr>{% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Шаг 9 · Причины и переоткрытия</div>
+      <div class="card-body">
+        <div class="kpi-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:14px;">
+          <div class="metric-card">
+            <div class="metric-label">Reopen rate</div>
+            <div class="metric-value">{{ step9.reopen_rate }}%</div>
+            <div class="metric-sub">Переоткрыто: {{ step9.reopened_count }} из {{ step9.closed_count }}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Топ категория</div>
+            <div class="metric-value">{{ step9.top_categories[0].count if step9.top_categories else 0 }}</div>
+            <div class="metric-sub">{{ step9.top_categories[0].name if step9.top_categories else 'Нет данных' }}</div>
+          </div>
+        </div>
+        <div style="display:grid;gap:10px;">
+          <div>
+            <div style="font-weight:600;margin-bottom:6px;">Причины закрытия</div>
+            {% for row in step9.top_close_reasons %}
+              <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><span>{{ row.reason }}</span><strong>{{ row.count }}</strong></div>
+            {% endfor %}
+            {% if not step9.top_close_reasons %}<div style="color:var(--muted)">Нет данных.</div>{% endif %}
+          </div>
+          <div>
+            <div style="font-weight:600;margin:10px 0 6px;">Нагрузка по операторам</div>
+            {% for row in step9.queue_hotspots %}
+              <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><span>{{ row.username }}</span><strong>{{ row.open_end }}</strong></div>
+            {% endfor %}
+            {% if not step9.queue_hotspots %}<div style="color:var(--muted)">Нет данных.</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/charts_theme.js') }}"></script>
+<script>
+  (function(){
+    const period = document.getElementById('periodSelect');
+    const df = document.getElementById('dateFrom');
+    const dt = document.getElementById('dateTo');
+    function sync(){ /* даты доступны всегда; учитываются при периоде "Свой период" */ }
+    period.addEventListener('change', sync);
+    sync();
+    // auto switch to custom period when user picks dates
+    function autoCustom(){
+      if (period.value !== 'custom') period.value = 'custom';
+    }
+    df.addEventListener('change', autoCustom);
+    dt.addEventListener('change', autoCustom);
+  })();
+
+  const flowLabels = {{ trends.labels|tojson }};
+  const flowCreated = {{ trends.created|tojson }};
+  const flowResolved = {{ trends.resolved|tojson }};
+
+  new Chart(document.getElementById('flowChart'), {
+    type: 'line',
+    data: {
+      labels: flowLabels,
+      datasets: [
+        { label: 'Создано', data: flowCreated, tension: 0.25, borderWidth: 2 },
+        { label: 'Закрыто', data: flowResolved, tension: 0.25, borderWidth: 2 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+  });
+
+  const prioLabels = {{ sla_by_priority.keys()|list|tojson }};
+  const onTime = {{ sla_by_priority.values()|map(attribute='on_time')|list|tojson }};
+  const overdue = {{ sla_by_priority.values()|map(attribute='overdue')|list|tojson }};
+
+  new Chart(document.getElementById('slaChart'), {
+    type:'bar',
+    data:{ labels: prioLabels, datasets:[
+      { label:'В срок', data:onTime, borderWidth:1 },
+      { label:'Просрочено', data:overdue, borderWidth:1 }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+  });
+</script>
+  </section>
+</div>
+{% endblock %}

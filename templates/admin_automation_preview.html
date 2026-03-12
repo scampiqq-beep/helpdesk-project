@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Предпросмотр автоматизации{% endblock %}
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<style>
+.auto-shell{display:grid;gap:18px}.auto-card{background:var(--surface,#fff);border:1px solid var(--border,#e5e7eb);border-radius:18px;padding:18px;box-shadow:var(--shadow-sm,0 10px 26px rgba(15,23,42,.05))}
+.auto-top{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.auto-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.auto-title{margin:0 0 8px;font-size:28px}.auto-sub{color:var(--muted,#6b7280);line-height:1.6}
+.auto-kpi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.auto-stat{padding:14px;border-radius:14px;border:1px solid var(--border,#e5e7eb);background:var(--surface-2,var(--bg))}.auto-stat .v{font-size:26px;font-weight:800}.auto-stat .l{font-size:13px;color:var(--muted,#6b7280)}
+.auto-list{display:flex;flex-wrap:wrap;gap:8px}.auto-chip{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:700}.auto-chip.ok{background:rgba(22,163,74,.12);color:#166534}.auto-chip.no{background:rgba(148,163,184,.18);color:var(--muted,#475569)}.auto-chip.warn{background:rgba(245,158,11,.15);color:#92400e}
+.auto-table{width:100%;border-collapse:collapse}.auto-table th,.auto-table td{padding:12px 10px;border-bottom:1px solid var(--border,#e5e7eb);text-align:left;vertical-align:top}.auto-table th{font-size:13px;color:var(--muted,#6b7280)}
+.auto-flow{display:grid;gap:10px}.auto-step{padding:14px;border-radius:14px;border:1px solid var(--border,#e5e7eb);background:var(--surface-2,var(--bg))}.auto-step.match{box-shadow:inset 4px 0 0 rgba(22,163,74,.55)}.auto-step.skip{box-shadow:inset 4px 0 0 rgba(148,163,184,.35)}
+.auto-state{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.state-box{padding:14px;border-radius:14px;border:1px solid var(--border,#e5e7eb);background:var(--surface-2,var(--bg))}.state-box h3{margin:0 0 10px}
+@media (max-width:1100px){.auto-top,.auto-grid,.auto-state{grid-template-columns:1fr}}
+</style>
+<div class="auto-shell">
+  <section class="auto-card auto-top">
+    <div>
+      <h1 class="auto-title">Предпросмотр автоматизации</h1>
+      <p class="auto-sub">На этой странице можно безопасно проверить, как правила автоматизации отработали бы на конкретной заявке. Это симуляция: данные заявки не меняются, а система только показывает цепочку условий, совпадения и итоговые изменения.</p>
+      <div class="auto-list" style="margin-top:12px;">
+        <span class="auto-chip warn">Заявка #{{ ticket.id }}</span>
+        <span class="auto-chip no">{{ ticket.status or 'Без статуса' }}</span>
+        <span class="auto-chip no">{{ ticket.priority or 'Без приоритета' }}</span>
+        {% if ticket.department_rel %}<span class="auto-chip no">{{ ticket.department_rel.name }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="auto-kpi">
+      <div class="auto-stat"><div class="v">{{ matched_rules_count }}</div><div class="l">Совпавших правил</div></div>
+      <div class="auto-stat"><div class="v">{{ execution_log_count }}</div><div class="l">Проверок в цепочке</div></div>
+      <div class="auto-stat"><div class="v">{{ (preview.mutations or {}).keys()|list|length }}</div><div class="l">Типов изменений</div></div>
+      <div class="auto-stat"><div class="v">{{ (preview.automation_context.internal_notes or [])|length }}</div><div class="l">Внутренних заметок</div></div>
+    </div>
+  </section>
+
+  <section class="auto-card">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+      <div>
+        <h2 style="margin:0 0 6px;">Тест на любой заявке</h2>
+        <div class="auto-sub">Быстро переключайтесь между недавними заявками и запускайте новую симуляцию.</div>
+      </div>
+      <form method="get" action="{{ url_for('admin_automation_preview', ticket_id=ticket.id) }}" onsubmit="this.action=this.action.replace(/\d+$/, this.ticket_id.value || '{{ ticket.id }}');" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <select name="ticket_id">
+          {% for item in recent_tickets %}<option value="{{ item.id }}" {% if item.id == ticket.id %}selected{% endif %}>#{{ item.id }} — {{ item.subject }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-primary" type="submit">Проверить</button>
+        <a class="btn btn-secondary" href="{{ url_for('admin_automation_index') }}">К правилам автоматизации</a>
+      </form>
+    </div>
+  </section>
+
+  <div class="auto-grid">
+    <section class="auto-card">
+      <h2 style="margin:0 0 10px;">Симуляция цепочки автоматизации</h2>
+      <div class="auto-flow">
+        {% for row in preview.execution_log %}
+          {% set is_matched = row.matched if row.matched is defined else row.get('matched', False) %}
+          {% set rule_key = row.rule_key if row.rule_key is defined else row.get('rule_key', '—') %}
+          {% set actions = row.applied_actions if row.applied_actions is defined else row.get('applied_actions', []) %}
+          {% set notes = row.notes if row.notes is defined else row.get('notes', []) %}
+          <div class="auto-step {{ 'match' if is_matched else 'skip' }}">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
+              <strong>{{ rule_key }}</strong>
+              <span class="auto-chip {{ 'ok' if is_matched else 'no' }}">{{ 'Сработало' if is_matched else 'Не совпало' }}</span>
+            </div>
+            {% if actions %}<div class="auto-sub" style="margin-top:8px;">Действия: {{ actions|join(', ') }}</div>{% endif %}
+            {% if notes %}<div class="auto-sub" style="margin-top:6px;">Примечания: {{ notes|join(', ') }}</div>{% endif %}
+          </div>
+        {% else %}
+          <div class="auto-sub">По этой заявке цепочка не сформировалась.</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="auto-card">
+      <h2 style="margin:0 0 10px;">Итог симуляции</h2>
+      <div class="auto-state">
+        <div class="state-box">
+          <h3>До автоматизации</h3>
+          <div class="auto-sub">Статус: <strong>{{ preview.before_state.status or '—' }}</strong></div>
+          <div class="auto-sub">Приоритет: <strong>{{ preview.before_state.priority or '—' }}</strong></div>
+          <div class="auto-sub">Отдел: <strong>{{ preview.before_state.department or '—' }}</strong></div>
+          <div class="auto-sub">Важная: <strong>{{ 'Да' if preview.before_state.is_critical else 'Нет' }}</strong></div>
+        </div>
+        <div class="state-box">
+          <h3>После автоматизации</h3>
+          <div class="auto-sub">Статус: <strong>{{ preview.after_state.status or '—' }}</strong></div>
+          <div class="auto-sub">Приоритет: <strong>{{ preview.after_state.priority or '—' }}</strong></div>
+          <div class="auto-sub">Отдел: <strong>{{ preview.after_state.department or '—' }}</strong></div>
+          <div class="auto-sub">Важная: <strong>{{ 'Да' if preview.after_state.is_critical else 'Нет' }}</strong></div>
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <h3 style="margin:0 0 8px;">Дополнительные изменения</h3>
+        <div class="auto-list">
+          {% for key, value in (preview.mutations or {}).items() %}
+            {% if value not in [None, '', [], {}] %}<span class="auto-chip warn">{{ key }}: {{ value }}</span>{% endif %}
+          {% else %}
+            <span class="auto-sub">Нет изменений.</span>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="auto-card">
+    <h2 style="margin:0 0 10px;">Журнал выполнения правил</h2>
+    <div class="auto-sub" style="margin-bottom:12px;">Это подробная таблица по каждой проверке правила: было совпадение или нет, какие действия подготовлены и какие служебные заметки появились в ходе симуляции.</div>
+    <div style="overflow:auto;">
+      <table class="auto-table">
+        <thead><tr><th>Правило</th><th>Результат</th><th>Действия</th><th>Примечания</th></tr></thead>
+        <tbody>
+          {% for row in preview.execution_log %}
+            {% set is_matched = row.matched if row.matched is defined else row.get('matched', False) %}
+            {% set rule_key = row.rule_key if row.rule_key is defined else row.get('rule_key', '—') %}
+            {% set actions = row.applied_actions if row.applied_actions is defined else row.get('applied_actions', []) %}
+            {% set notes = row.notes if row.notes is defined else row.get('notes', []) %}
+            <tr>
+              <td><code>{{ rule_key }}</code></td>
+              <td><span class="auto-chip {{ 'ok' if is_matched else 'no' }}">{{ 'Сработало' if is_matched else 'Не сработало' }}</span></td>
+              <td>{{ actions|join(', ') if actions else '—' }}</td>
+              <td>{{ notes|join(', ') if notes else '—' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="auto-sub">Лог пуст.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

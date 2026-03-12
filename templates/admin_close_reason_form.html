@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% if reason %}
+  {% set title = 'Редактирование причины' %}
+{% else %}
+  {% set title = 'Новая причина' %}
+{% endif %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container py-3" style="max-width: 760px;">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h4 mb-0">{{ title }}</h2>
+    <a class="btn btn-light btn-sm" href="{{ url_for('admin_close_reasons') }}">Назад</a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <form method="POST">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Code</label>
+            <input class="form-control" name="code" value="{{ reason.code if reason else '' }}" placeholder="spam" required>
+            <div class="form-text">Латиница/цифры/underscore. Используется в БД.</div>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Название</label>
+            <input class="form-control" name="name" value="{{ reason.name if reason else '' }}" placeholder="Спам" required>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Порядок</label>
+            <input class="form-control" name="sort_order" value="{{ reason.sort_order if reason else 0 }}" type="number">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Активна</label>
+            <select class="form-select" name="is_active">
+              <option value="1" {% if (reason is none) or reason.is_active %}selected{% endif %}>Да</option>
+              <option value="0" {% if reason and (not reason.is_active) %}selected{% endif %}>Нет</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Требовать комментарий</label>
+            <select class="form-select" name="require_comment">
+              <option value="0" {% if (reason is none) or (not reason.require_comment) %}selected{% endif %}>Нет</option>
+              <option value="1" {% if reason and reason.require_comment %}selected{% endif %}>Да</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <button class="btn btn-primary" type="submit">Сохранить</button>
+          <a class="btn btn-light" href="{{ url_for('admin_close_reasons') }}">Отмена</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Email Check</title>
+</head>
+<body>
+    <h1>Debug Email Information</h1>
+    
+    <h2>Current User</h2>
+    <pre>{{ user_info }}</pre>
+    
+    <h2>Tickets with this email</h2>
+    {% if tickets %}
+        <table border="1">
+            <tr>
+                <th>ID</th>
+                <th>Subject</th>
+                <th>Email in ticket</th>
+                <th>Normalized</th>
+                <th>Created</th>
+            </tr>
+            {% for ticket in tickets %}
+            <tr>
+                <td>{{ ticket.id|ticket_id }}</td>
+                <td>{{ ticket.subject }}</td>
+                <td>{{ ticket.email }}</td>
+                <td>{{ normalize_email(ticket.email) }}</td>
+                <td>{{ ticket.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>No tickets found with email: {{ user_info.email }}</p>
+    {% endif %}
+    
+    <h2>Test API Access</h2>
+    <form id="testForm">
+        <label>Ticket ID: <input type="number" id="ticketId" required></label>
+        <button type="button" onclick="testApiAccess()">Test API Access</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <script>
+    function testApiAccess() {
+        const ticketId = document.getElementById('ticketId').value;
+        const resultDiv = document.getElementById('result');
+        
+        fetch(`/api/ticket/${ticketId}`)
+            .then(response => {
+                resultDiv.innerHTML = `<h3>Response Status: ${response.status}</h3>`;
+                return response.json();
+            })
+            .then(data => {
+                resultDiv.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            })
+            .catch(error => {
+                resultDiv.innerHTML += `<p style="color: red">Error: ${error}</p>`;
+            });
+    }
+    </script>
+</body>
+</html>

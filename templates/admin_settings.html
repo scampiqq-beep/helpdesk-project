@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+{% block title %}{{ section_title }}{% endblock %}
+
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<style>
+.admin-settings-shell .card{border-radius:16px}
+.admin-settings-shell .card-header{font-weight:800}
+.admin-settings-intro{max-width:70ch}
+.admin-settings-shell .filters-grid{gap:14px 16px}
+.admin-settings-shell .table-responsive{overflow:auto}
+.admin-settings-shell .tickets-table th{white-space:nowrap}
+.admin-settings-shell form + form{margin-top:12px}
+.admin-settings-shell .admin-actions{display:flex;align-items:flex-end;gap:10px;margin-top:8px}
+.admin-settings-shell .admin-actions--end{justify-content:flex-end}
+.admin-settings-shell .admin-block{padding:14px;border:1px solid var(--border,#e5e7eb);border-radius:12px;background:var(--surface-2,var(--bg))}
+.admin-settings-shell .admin-grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:16px}
+.admin-settings-shell .btn{white-space:nowrap}
+</style>
+{% set section_intro = {
+  'bitrix': 'Параметры интеграции с Bitrix24 по отделам.',
+  'departments': 'Справочник отделов, которые используются в маршрутизации и назначении заявок.',
+  'categories': 'Категории заявок, доступные при создании и обработке обращений.',
+  'tags': 'Справочник тегов для быстрого поиска и фильтрации.',
+  'system': 'Базовые параметры системы и поведения заявок.',
+  'mail_outgoing': 'Настройка исходящей почты и тестирование SMTP.',
+  'mail_templates': 'Редактирование шаблонов исходящих писем.',
+  'mail_logs': 'Журнал отправки исходящих писем и результаты тестов.',
+  'mail_parser': 'Параметры входящего парсера, создание заявок и обработка ответов.',
+  'notifications': 'Настройка внутрисистемных уведомлений для клиентов и операторов.',
+  'important_rules': 'Правила, по которым новые заявки автоматически помечаются как важные.'
+}[section] %}
+<div class="admin-settings-shell">
+<div class="admin-page-head">
+  <div>
+    <h1 class="admin-page-title">{{ section_title }}</h1>
+    <p class="admin-page-subtitle admin-settings-intro">{{ section_intro }}</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">{{ section_title }}</div>
+  <div class="card-body">
+
+    {% if section == 'bitrix' %}
+      <div class="table-responsive">
+        <table class="tickets-table">
+          <thead><tr><th>Отдел</th><th>Ответственный</th><th>Соисполнители</th><th>Webhook</th><th></th></tr></thead>
+          <tbody>
+          {% for row in bitrix_settings %}
+            <tr>
+              <form method="post">
+                <input type="hidden" name="action" value="save_bitrix">
+                <input type="hidden" name="department" value="{{ row.department }}">
+                <td><strong>{{ row.department }}</strong></td>
+                <td><input class="form-control" type="text" name="responsible_id" value="{{ row.responsible_id }}"></td>
+                <td><input class="form-control" type="text" name="accomplices" value="{{ row.accomplices }}"></td>
+                <td><input class="form-control" type="text" name="webhook_url" value="{{ row.webhook_url or '' }}"></td>
+                <td style="text-align:right"><button class="btn btn-action-primary" type="submit">Сохранить</button></td>
+              </form>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif section == 'departments' %}
+      <form method="post" class="filters-grid" style="margin-bottom:18px">
+        <input type="hidden" name="action" value="add_department">
+        <div><label class="form-label">Новый отдел</label><input class="form-control" type="text" name="dept_name" required></div>
+        <div class="admin-actions"><button class="btn btn-action-primary" type="submit">Добавить отдел</button></div>
+      </form>
+      <div class="table-responsive">
+        <table class="tickets-table">
+          <thead><tr><th>ID</th><th>Название</th><th></th><th></th></tr></thead>
+          <tbody>
+          {% for dept in departments %}
+            <tr>
+              <td>{{ dept.id }}</td>
+              <td>
+                <form method="post" style="display:flex;gap:10px;align-items:center">
+                  <input type="hidden" name="action" value="rename_department">
+                  <input type="hidden" name="dept_id" value="{{ dept.id }}">
+                  <input class="form-control" type="text" name="new_name" value="{{ dept.name }}" required>
+                  <button class="btn btn-action" type="submit">Переименовать</button>
+                </form>
+              </td>
+              <td style="width:1%">
+                <form method="post" onsubmit="return confirm('Удалить отдел?')">
+                  <input type="hidden" name="action" value="delete_department">
+                  <input type="hidden" name="dept_id" value="{{ dept.id }}">
+                  <button class="btn btn-danger" type="submit">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif section == 'tags' %}
+      <form method="post" class="filters-grid" style="margin-bottom:18px">
+        <input type="hidden" name="action" value="add_tag">
+        <div><label class="form-label">Название тега</label><input class="form-control" type="text" name="tag_name" required></div>
+        <div><label class="form-label">Цвет</label><input class="form-control" type="text" name="tag_color" placeholder="#2563eb"></div>
+        <div class="admin-actions"><button class="btn btn-action-primary" type="submit">Добавить тег</button></div>
+      </form>
+      <div class="table-responsive">
+        <table class="tickets-table">
+          <thead><tr><th>ID</th><th>Название</th><th>Цвет</th><th>Активен</th><th></th></tr></thead>
+          <tbody>
+          {% for tag in tags %}
+            <tr>
+              <form method="post">
+                <input type="hidden" name="action" value="edit_tag">
+                <input type="hidden" name="tag_id" value="{{ tag.id }}">
+                <td>{{ tag.id }}</td>
+                <td><input class="form-control" type="text" name="tag_name" value="{{ tag.name }}" required></td>
+                <td><input class="form-control" type="text" name="tag_color" value="{{ tag.color or '' }}"></td>
+                <td><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="is_active" value="1" {% if tag.is_active %}checked{% endif %}> Да</label></td>
+                <td style="display:flex;gap:8px;justify-content:flex-end">
+                  <button class="btn btn-action" type="submit">Сохранить</button>
+              </form>
+                  <form method="post" onsubmit="return confirm('Удалить тег?')">
+                    <input type="hidden" name="action" value="delete_tag">
+                    <input type="hidden" name="tag_id" value="{{ tag.id }}">
+                    <button class="btn btn-danger" type="submit">Удалить</button>
+                  </form>
+                </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif section == 'categories' %}
+      <form method="post" class="filters-grid" style="margin-bottom:18px">
+        <input type="hidden" name="action" value="add_ticket_category">
+        <div><label class="form-label">Код категории</label><input class="form-control" type="text" name="code" placeholder="incident" required></div>
+        <div><label class="form-label">Название</label><input class="form-control" type="text" name="name" placeholder="Инцидент" required></div>
+        <div><label class="form-label">Порядок</label><input class="form-control" type="number" name="sort_order" value="0"></div>
+        <div class="admin-actions"><button class="btn btn-action-primary" type="submit">Добавить категорию</button></div>
+      </form>
+      <div class="table-responsive">
+        <table class="tickets-table">
+          <thead><tr><th>ID</th><th>Код</th><th>Название</th><th>Порядок</th><th>Активна</th><th></th></tr></thead>
+          <tbody>
+          {% for cat in ticket_categories %}
+            <tr>
+              <form method="post">
+                <input type="hidden" name="action" value="edit_ticket_category">
+                <input type="hidden" name="cat_id" value="{{ cat.id }}">
+                <td>{{ cat.id }}</td>
+                <td><input class="form-control" type="text" name="code" value="{{ cat.code }}" required></td>
+                <td><input class="form-control" type="text" name="name" value="{{ cat.name }}" required></td>
+                <td><input class="form-control" type="number" name="sort_order" value="{{ cat.sort_order or 0 }}"></td>
+                <td><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="is_active" value="1" {% if cat.is_active %}checked{% endif %}> Да</label></td>
+                <td style="display:flex;gap:8px;justify-content:flex-end">
+                  <button class="btn btn-action" type="submit">Сохранить</button>
+              </form>
+                  <form method="post" onsubmit="return confirm('Удалить категорию?')">
+                    <input type="hidden" name="action" value="delete_ticket_category">
+                    <input type="hidden" name="cat_id" value="{{ cat.id }}">
+                    <button class="btn btn-danger" type="submit">Удалить</button>
+                  </form>
+                </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif section == 'system' %}
+      <form method="post" class="filters-grid">
+        <input type="hidden" name="action" value="save_system">
+        <div>
+          <label class="form-label">Отдел по умолчанию для приёма обращений</label>
+          <select class="form-select" name="default_intake_department_id">
+            <option value="">Не выбран</option>
+            {% for dept in departments %}<option value="{{ dept.id }}" {% if system_settings.default_intake_department_id|string == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Контроль профиля</label>
+          <select class="form-select" name="profile_enforcement_mode">
+            <option value="strict" {% if system_settings.profile_enforcement_mode == 'strict' %}selected{% endif %}>Строгий</option>
+            <option value="soft" {% if system_settings.profile_enforcement_mode == 'soft' %}selected{% endif %}>Мягкий</option>
+            <option value="off" {% if system_settings.profile_enforcement_mode == 'off' %}selected{% endif %}>Выключен</option>
+          </select>
+        </div>
+        <div class="admin-actions"><button class="btn btn-action-primary" type="submit">Сохранить</button></div>
+      </form>
+    {% elif section == 'mail' %}
+      <div class="admin-page-subtitle" style="margin-bottom:16px">Старый раздел сохранён для совместимости. Основные настройки исходящей почты, шаблоны и журнал теперь вынесены в отдельные страницы слева.</div>
+      <form method="post" class="filters-grid">
+        <input type="hidden" name="action" value="save_mail">
+        <div><label class="form-label">Сервер</label><input class="form-control" type="text" name="MAIL_SERVER" value="{{ mail_settings.MAIL_SERVER }}"></div>
+        <div><label class="form-label">Порт</label><input class="form-control" type="number" name="MAIL_PORT" value="{{ mail_settings.MAIL_PORT }}"></div>
+        <div><label class="form-label">Логин</label><input class="form-control" type="text" name="MAIL_USERNAME" value="{{ mail_settings.MAIL_USERNAME }}"></div>
+        <div><label class="form-label">Пароль</label><input class="form-control" type="password" name="MAIL_PASSWORD" value="{{ mail_settings.MAIL_PASSWORD }}"></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="MAIL_USE_TLS" value="True" {% if mail_settings.MAIL_USE_TLS %}checked{% endif %}> Использовать TLS</label></div>
+        <div class="admin-actions">
+          <button class="btn btn-action-primary" type="submit">Сохранить совместимые настройки</button>
+        </div>
+      </form>
+    {% elif section == 'mail_outgoing' %}
+      <div class="admin-page-subtitle" style="margin-bottom:16px">Здесь настраивается исходящая почта helpdesk. Все письма отправляются от имени техподдержки. После заполнения полей можно проверить соединение и отправить тестовое письмо. Пока поля пустые, система ничего не отправляет и не падает.</div>
+      <form method="post" class="filters-grid">
+        <input type="hidden" name="action" value="save_outgoing_mail">
+        <div><label class="form-label">SMTP сервер</label><input class="form-control" type="text" name="smtp_host" value="{{ outgoing_mail_settings.smtp_host }}"></div>
+        <div><label class="form-label">SMTP порт</label><input class="form-control" type="number" name="smtp_port" value="{{ outgoing_mail_settings.smtp_port }}"></div>
+        <div><label class="form-label">SMTP логин</label><input class="form-control" type="text" name="smtp_username" value="{{ outgoing_mail_settings.username }}"></div>
+        <div><label class="form-label">SMTP пароль</label><input class="form-control" type="password" name="smtp_password" value="{{ outgoing_mail_settings.password }}"></div>
+        <div><label class="form-label">Email отправителя</label><input class="form-control" type="email" name="sender_email" value="{{ outgoing_mail_settings.sender_email }}" placeholder="support@example.ru"></div>
+        <div><label class="form-label">Имя отправителя</label><input class="form-control" type="text" name="sender_name" value="{{ outgoing_mail_settings.sender_name }}"></div>
+        <div><label class="form-label">Таймаут соединения, сек</label><input class="form-control" type="number" min="5" name="smtp_timeout" value="{{ outgoing_mail_settings.timeout }}"></div>
+        <div><label class="form-label">Лимит писем в минуту</label><input class="form-control" type="number" min="1" name="max_per_minute" value="{{ outgoing_mail_settings.max_per_minute }}"></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="mail_outgoing_enabled" value="1" {% if outgoing_mail_settings.enabled %}checked{% endif %}> Включить исходящую почту</label></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="smtp_use_ssl" value="1" {% if outgoing_mail_settings.use_ssl %}checked{% endif %}> Использовать SSL</label></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="smtp_use_starttls" value="1" {% if outgoing_mail_settings.use_starttls %}checked{% endif %}> Использовать STARTTLS</label></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="retry_enabled" value="1" {% if outgoing_mail_settings.retry_enabled %}checked{% endif %}> Повторять отправку при ошибке</label></div>
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;padding:14px;border:1px solid var(--border,#e5e7eb);border-radius:12px;background:var(--surface-2,var(--bg))">
+          <div style="font-weight:700;grid-column:1/-1">Когда отправлять письма</div>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="event_ticket_created" value="1" {% if outgoing_mail_settings.event_ticket_created %}checked{% endif %}> При создании заявки</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="event_operator_reply" value="1" {% if outgoing_mail_settings.event_operator_reply %}checked{% endif %}> При ответе оператора</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="event_status_changed" value="1" {% if outgoing_mail_settings.event_status_changed %}checked{% endif %}> При изменении статуса</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="event_ticket_closed" value="1" {% if outgoing_mail_settings.event_ticket_closed %}checked{% endif %}> При закрытии заявки</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="event_sla_warning" value="1" {% if outgoing_mail_settings.event_sla_warning %}checked{% endif %}> При предупреждении SLA</label>
+        </div>
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;padding:14px;border:1px solid var(--border,#e5e7eb);border-radius:12px;background:var(--surface-2,var(--bg))">
+          <div style="font-weight:700;grid-column:1/-1">Защита от циклов</div>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="suppress_auto_submitted" value="1" {% if outgoing_mail_settings.suppress_auto_submitted %}checked{% endif %}> Игнорировать auto-generated и bulk ответы</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="ignore_own_sender" value="1" {% if outgoing_mail_settings.ignore_own_sender %}checked{% endif %}> Игнорировать письма от собственного ящика</label>
+        </div>
+        <div class="admin-actions" style="grid-column:1/-1"><button class="btn btn-action-primary" type="submit">Сохранить настройки исходящей почты</button></div>
+      </form>
+      <div class="admin-grid-2">
+        <div class="admin-block">
+          <div style="font-weight:700;margin-bottom:8px">Проверка SMTP</div>
+          <div class="text-muted" style="margin-bottom:12px">Проверка соединения с SMTP без отправки письма.</div>
+          <form method="post">
+            <input type="hidden" name="action" value="test_outgoing_mail_connection">
+            <button class="btn btn-action" type="submit">Проверить SMTP</button>
+          </form>
+        </div>
+        <div class="admin-block">
+          <div style="font-weight:700;margin-bottom:8px">Тестовое письмо</div>
+          <form method="post" style="display:grid;gap:12px">
+            <input type="hidden" name="action" value="send_outgoing_test_mail">
+            <div><label class="form-label">Email получателя</label><input class="form-control" type="email" name="test_recipient" value="{{ outgoing_mail_settings.test_recipient }}" placeholder="you@example.ru"></div>
+            <div><button class="btn btn-secondary" type="submit">Отправить тестовое письмо</button></div>
+          </form>
+        </div>
+      </div>
+    {% elif section == 'mail_templates' %}
+      <div class="admin-page-subtitle" style="margin-bottom:16px">Поддерживаются переменные: {% for item in mail_template_variables %}<code>{{ item }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.</div>
+      <div style="display:grid;gap:16px">
+        {% for tpl in mail_templates %}
+          <div class="card" style="padding:16px">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px">
+              <div>
+                <div style="font-weight:800">{{ tpl.title }}</div>
+                <div class="text-muted">{{ tpl.description }}</div>
+                <div class="text-muted" style="margin-top:4px">Ключ шаблона: <code>{{ tpl.key }}</code></div>
+              </div>
+            </div>
+            <form method="post" style="display:grid;gap:12px">
+              <input type="hidden" name="action" value="save_mail_template">
+              <input type="hidden" name="template_key" value="{{ tpl.key }}">
+              <div><label class="form-label">Тема письма</label><input class="form-control" type="text" name="template_subject" value="{{ tpl.subject }}"></div>
+              <div><label class="form-label">Тело письма</label><textarea class="form-control" name="template_body" rows="8">{{ tpl.body }}</textarea></div>
+              <div><button class="btn btn-action-primary" type="submit">Сохранить шаблон</button></div>
+            </form>
+            <form method="post" onsubmit="return confirm('Сбросить шаблон к значениям по умолчанию?')" style="margin-top:10px">
+              <input type="hidden" name="action" value="reset_mail_template">
+              <input type="hidden" name="template_key" value="{{ tpl.key }}">
+              <button class="btn btn-secondary" type="submit">Сбросить по умолчанию</button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    {% elif section == 'mail_logs' %}
+      <div class="admin-page-subtitle" style="margin-bottom:16px">История тестовых и рабочих исходящих писем.</div>
+      {% if mail_logs %}
+      <div class="table-responsive">
+        <table class="tickets-table">
+          <thead><tr><th>Время</th><th>Получатель</th><th>Тип</th><th>Тема</th><th>Статус</th><th>Сообщение</th></tr></thead>
+          <tbody>
+          {% for row in mail_logs %}
+            <tr>
+              <td>{{ row.ts }}</td>
+              <td>{{ row.recipient or '—' }}</td>
+              <td>{{ row.template_key or '—' }}</td>
+              <td>{{ row.subject or '—' }}</td>
+              <td>{{ row.status }}</td>
+              <td>{{ row.message }}{% if row.details %}<div class="text-muted" style="margin-top:4px">{{ row.details }}</div>{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="text-muted">Почтовый журнал пока пуст.</div>
+      {% endif %}
+    {% elif section == 'mail_parser' %}
+      <div class="admin-page-subtitle" style="margin-bottom:16px">Укажите параметры IMAP-ящика, правила обработки и отдел, куда будут попадать новые заявки.</div>
+      <form method="post" class="filters-grid">
+        <input type="hidden" name="action" value="save_mail_parser">
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="mail_parser_enabled" value="1" {% if mail_parser_settings.enabled %}checked{% endif %}> Включить парсер почты</label></div>
+        <div><label class="form-label">IMAP сервер</label><input class="form-control" type="text" name="imap_server" value="{{ mail_parser_settings.imap_server }}"></div>
+        <div><label class="form-label">Порт</label><input class="form-control" type="number" name="imap_port" value="{{ mail_parser_settings.imap_port }}"></div>
+        <div><label class="form-label">Логин</label><input class="form-control" type="text" name="imap_username" value="{{ mail_parser_settings.imap_username }}"></div>
+        <div><label class="form-label">Пароль</label><input class="form-control" type="password" name="imap_password" value="{{ mail_parser_settings.imap_password }}"></div>
+        <div><label class="form-label">Папка</label><input class="form-control" type="text" name="mail_folder" value="{{ mail_parser_settings.folder }}"></div>
+        <div><label class="form-label">Фильтр по теме</label><input class="form-control" type="text" name="subject_filter" value="{{ mail_parser_settings.subject_filter }}" placeholder="Оставьте пустым, чтобы обрабатывать все письма"></div>
+        <div><label class="form-label">Отдел для новых заявок</label><select class="form-select" name="mail_parser_department_id"><option value="">Выбрать отдел</option>{% for dept in departments %}<option value="{{ dept.id }}" {% if mail_parser_settings.department_id|string == dept.id|string %}selected{% endif %}>{{ dept.name }}</option>{% endfor %}</select></div>
+        <div><label class="form-label">Интервал проверки, сек</label><input class="form-control" type="number" min="10" name="check_interval" value="{{ mail_parser_settings.check_interval }}"></div>
+        <div><label class="form-label">Максимум писем за один запуск</label><input class="form-control" type="number" min="1" max="200" name="max_per_run" value="{{ mail_parser_settings.max_per_run }}"></div>
+        <div><label class="form-label">Разрешённые домены отправителей</label><input class="form-control" type="text" name="allowed_domains" value="{{ mail_parser_settings.allowed_domains }}" placeholder="example.ru, client.ru"></div>
+        <div style="grid-column:1/-1"><label class="form-label">Игнорируемые email-адреса</label><input class="form-control" type="text" name="ignored_emails" value="{{ mail_parser_settings.ignored_emails }}" placeholder="noreply@example.ru, bot@example.ru"></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="imap_use_ssl" value="1" {% if mail_parser_settings.imap_use_ssl %}checked{% endif %}> Использовать SSL</label></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="only_unseen" value="1" {% if mail_parser_settings.only_unseen %}checked{% endif %}> Обрабатывать только непрочитанные</label></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="mark_seen" value="1" {% if mail_parser_settings.mark_seen %}checked{% endif %}> Помечать письма как прочитанные</label></div>
+        <div><label style="display:flex;align-items:center;gap:8px;margin-top:32px"><input type="checkbox" name="strip_quotes" value="1" {% if mail_parser_settings.strip_quotes %}checked{% endif %}> Обрезать цитаты и подписи в ответах</label></div>
+        <div style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" name="append_to_ticket" value="1" {% if mail_parser_settings.append_to_ticket %}checked{% endif %}> Добавлять письмо как комментарий, если в теме найден номер заявки (#123)</label></div>
+        <div class="admin-actions"><button class="btn btn-action-primary" type="submit">Сохранить настройки парсера</button></div>
+      </form>
+      <div class="admin-grid-2">
+        <div class="admin-block">
+          <div style="font-weight:700;margin-bottom:8px">Текущее состояние</div>
+          <div style="display:grid;gap:6px;color:var(--muted,#6b7280)">
+            <div>Выполняется: <strong>{{ 'Да' if mail_parser_state.running else 'Нет' }}</strong></div>
+            <div>Последний запуск: {{ mail_parser_state.last_started_at or '—' }}</div>
+            <div>Последнее успешное выполнение: {{ mail_parser_state.last_success_at or '—' }}</div>
+            <div>Последнее завершение: {{ mail_parser_state.last_finished_at or '—' }}</div>
+            <div>Последняя ошибка: {{ mail_parser_state.last_error or '—' }}</div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+            <form method="post">
+              <input type="hidden" name="action" value="run_mail_parser_now">
+              <button class="btn btn-action" type="submit">Проверить почту сейчас</button>
+            </form>
+            <form method="post">
+              <input type="hidden" name="action" value="test_mail_parser_connection">
+              <button class="btn btn-secondary" type="submit">Проверить подключение</button>
+            </form>
+          </div>
+        </div>
+        <div class="admin-block">
+          <div style="font-weight:700;margin-bottom:8px">Как это работает</div>
+          <div style="display:grid;gap:8px;color:var(--muted,#6b7280)">
+            <div>• каждое письмо проходит защиту от дублей по Message-ID или хэшу письма;</div>
+            <div>• HTML-письма преобразуются в обычный текст;</div>
+            <div>• вложения сохраняются вместе с заявкой или комментарием;</div>
+            <div>• ответы в темы вида <strong>#123</strong> можно автоматически добавлять в существующую заявку.</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:14px;border:1px solid var(--border,#e5e7eb);border-radius:12px;background:var(--surface-2,var(--bg))">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <div style="font-weight:700">Журнал обработки</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="text-muted">Всего записей: {{ mail_parser_log_page.total if mail_parser_log_page else 0 }}</span>
+            <form method="post" onsubmit="return confirm('Очистить журнал обработки?')">
+              <input type="hidden" name="action" value="clear_mail_parser_log">
+              <button class="btn btn-danger" type="submit">Очистить историю</button>
+            </form>
+          </div>
+        </div>
+        {% if mail_parser_log %}
+          <div style="overflow:auto;max-height:50vh">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Время</th>
+                  <th>Событие</th>
+                  <th>Сообщение</th>
+                  <th>Email</th>
+                  <th>Заявка</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in mail_parser_log %}
+                  <tr>
+                    <td>{{ row.ts }}</td>
+                    <td>{{ row.action }}</td>
+                    <td>{{ row.message }}</td>
+                    <td>{{ row.email or '—' }}</td>
+                    <td>{% if row.ticket_id %}<a href="{{ url_for('ticket_detail', ticket_id=row.ticket_id) }}">#{{ row.ticket_id }}</a>{% else %}—{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if mail_parser_log_page and mail_parser_log_page.pages > 1 %}
+            <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+              {% if mail_parser_log_page.has_prev %}<a class="btn btn-secondary" href="{{ url_for('admin_settings_section', section='mail_parser', log_page=mail_parser_log_page.prev_num, log_per_page=mail_parser_log_page.per_page) }}">← Назад</a>{% endif %}
+              <span class="text-muted">Страница {{ mail_parser_log_page.page }} из {{ mail_parser_log_page.pages }}</span>
+              {% if mail_parser_log_page.has_next %}<a class="btn btn-secondary" href="{{ url_for('admin_settings_section', section='mail_parser', log_page=mail_parser_log_page.next_num, log_per_page=mail_parser_log_page.per_page) }}">Вперёд →</a>{% endif %}
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="text-muted">Журнал пока пуст. После первого запуска здесь появятся результаты обработки писем.</div>
+        {% endif %}
+      </div>
+    {% elif section == 'important_rules' %}
+      <form method="post" class="filters-grid">
+        <input type="hidden" name="action" value="save_ticket_importance_rules">
+        <div style="grid-column:1/-1" class="admin-block">
+          <div style="font-weight:700;margin-bottom:8px">Как это работает</div>
+          <div style="display:grid;gap:8px;color:var(--muted,#6b7280)">
+            <div>Новая заявка станет важной только если совпадёт хотя бы одно правило ниже.</div>
+            <div>Оператор по-прежнему может вручную отметить заявку как важную внутри карточки.</div>
+            <div>Автоэскалация по срокам для признака «Важная задача» отключена.</div>
+          </div>
+        </div>
+        <div><label class="form-label">Ключевые слова</label><textarea class="form-control" name="important_keywords" rows="10" placeholder="срочно&#10;критично&#10;авария">{{ important_rules.keywords or '' }}</textarea><div class="form-text">Одно слово или фраза на строку. Ищется в теме и тексте письма.</div></div>
+        <div><label class="form-label">Email-адреса</label><textarea class="form-control" name="important_emails" rows="10" placeholder="vip@company.ru&#10;director@company.ru">{{ important_rules.emails or '' }}</textarea><div class="form-text">Одно значение на строку.</div></div>
+        <div><label class="form-label">ИНН</label><textarea class="form-control" name="important_inns" rows="10" placeholder="7707083893&#10;123456789012">{{ important_rules.inns or '' }}</textarea><div class="form-text">Одно значение на строку. Можно указывать 10 или 12 цифр.</div></div>
+        <div class="admin-actions"><button class="btn btn-action-primary" type="submit">Сохранить правила важности</button></div>
+      </form>
+
+    {% elif section == 'notifications' %}
+      <div class="admin-page-subtitle" style="margin-bottom:16px">Здесь настраивается, кого и о каких событиях уведомлять внутри системы. После сохранения новые правила применяются сразу: к колокольчику, выпадающему списку уведомлений и странице уведомлений.</div>
+      <form method="post" class="filters-grid">
+        <input type="hidden" name="action" value="save_notifications_settings">
+
+        <div class="card" style="padding:16px;grid-column:1/-1">
+          <div style="font-weight:700;margin-bottom:10px">Общие настройки</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="notif_enabled" {% if notif_settings.enabled %}checked{% endif %}> Включить уведомления в системе</label>
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="notif_ops" {% if notif_settings.enabled_for_operators %}checked{% endif %}> Показывать операторам</label>
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="notif_clients" {% if notif_settings.enabled_for_clients %}checked{% endif %}> Показывать клиентам</label>
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px;grid-column:1/-1">
+          <div style="font-weight:700;margin-bottom:10px">Какие события показывать</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 18px">
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_new_ticket" {% if notif_settings.event_new_ticket %}checked{% endif %}><span><strong>Новая заявка</strong><br><span class="text-muted">Оператору приходит уведомление о новой заявке или заявке, попавшей в отдел.</span></span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_assigned" {% if notif_settings.event_assigned %}checked{% endif %}><span><strong>Назначение и привязка</strong><br><span class="text-muted">Назначение исполнителя, привязка к отделу, создание заявки для клиента.</span></span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_customer_reply" {% if notif_settings.event_customer_reply %}checked{% endif %}><span><strong>Ответ клиента</strong><br><span class="text-muted">Новый комментарий или ответ клиента по заявке.</span></span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_operator_reply" {% if notif_settings.event_operator_reply %}checked{% endif %}><span><strong>Ответ оператора</strong><br><span class="text-muted">Комментарий или ответ оператора клиенту.</span></span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_status" {% if notif_settings.event_status %}checked{% endif %}><span><strong>Изменение статуса</strong><br><span class="text-muted">Перевод заявки между статусами.</span></span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_priority" {% if notif_settings.event_priority %}checked{% endif %}><span><strong>Изменение приоритета</strong><br><span class="text-muted">Смена обычного или критичного приоритета заявки.</span></span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_opchat" {% if notif_settings.event_opchat %}checked{% endif %}><span><strong>Чат операторов</strong><br><span class="text-muted">Новые сообщения во внутреннем чате операторов.</span></span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_important" {% if notif_settings.event_important %}checked{% endif %}><span><strong>Важная задача</strong><br><span class="text-muted">Отдельные уведомления по важным заявкам и их изменению.</span></span></label>
+            <label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="event_sla" {% if notif_settings.event_sla %}checked{% endif %}><span><strong>SLA и просрочки</strong><br><span class="text-muted">Нарушение SLA, приближение просрочки и эскалации.</span></span></label>
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px;grid-column:1/-1">
+          <div style="font-weight:700;margin-bottom:10px">Как это работает</div>
+          <div class="text-muted" style="display:grid;gap:6px">
+            <div>• Колокольчик в верхней панели показывает общее количество непрочитанных уведомлений.</div>
+            <div>• В выпадающем списке видны последние уведомления и непрочитанные треды чата операторов.</div>
+            <div>• Страница «Уведомления» показывает полный список уведомлений с переходом в заявку.</div>
+            <div>• Сейчас настраиваются уведомления внутри системы. Почтовые уведомления в этот шаг не включались.</div>
+          </div>
+        </div>
+
+        <div class="admin-actions" style="grid-column:1/-1"><button class="btn btn-action-primary" type="submit">Сохранить настройки уведомлений</button></div>
+      </form>
+    {% endif %}
+
+  </div>
+</div>
+</div>
+</section>
+</div>
+{% endblock %}

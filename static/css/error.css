@@ -1,0 +1,74 @@
+.error-container {
+    padding: 30px;
+    text-align: left;
+    max-width: 550px;
+    margin: 40px auto;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.error-code {
+    font-size: 2.2rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #495057;
+    line-height: 1.2;
+}
+
+.error-title {
+    font-size: 1.3rem;
+    font-weight: 500;
+    margin-bottom: 15px;
+    color: #6c757d;
+}
+
+.error-message {
+    font-size: 0.92rem;
+    color: #868e96;
+    margin-bottom: 25px;
+    line-height: 1.5;
+}
+
+.error-btn {
+    display: inline-block;
+    padding: 7px 18px;
+    background-color: #a8e6cf;
+    color: #333;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.2s;
+}
+
+.error-btn:hover {
+    background-color: #87dda1;
+    text-decoration: none;
+    color: #333;
+}
+
+.error-403 .error-btn {
+    background-color: #ffd3b6;
+}
+
+.error-403 .error-btn:hover {
+    background-color: #ffb380;
+}
+
+.error-500 .error-btn {
+    background-color: #ffaaa5;
+}
+
+.error-500 .error-btn:hover {
+    background-color: #ff7b72;
+}
+
+.error-401 .error-btn {
+    background-color: #a8d8ff;
+}
+
+.error-401 .error-btn:hover {
+    background-color: #7abaff;
+}

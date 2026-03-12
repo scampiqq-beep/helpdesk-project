@@ -1,0 +1,674 @@
+/* === Единые пастельные статусы для всей системы === */
+.status-badge {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  font-size: 0.875em;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+  border-radius: 0.375rem;
+  transition: all 0.15s ease;
+}
+
+/* Пастельные цвета */
+.status-badge.status-new,
+.status-badge.status-Новая {
+  background-color: #cce5ff;
+  color: #004085;
+  border: 1px solid #b8daff;
+}
+
+.status-badge.status-accepted,
+.status-badge.status-Принята {
+  background-color: #ffe0b2;
+  color: #5a3a00;
+  border: 1px solid #ffd480;
+}
+
+/* "В работе" — более насыщенный оранжевый */
+.status-badge.status-inwork,
+.status-badge.status-В\ работе {
+  background-color: #ffe8cc;
+  color: #7a3e00;
+  border: 1px solid #ffd8a8;
+}
+
+/* "Ожидает подтверждения клиента" — фиолетовый */
+.status-badge.status-wait_client,
+.status-badge.status-Ожидает\ подтверждения\ клиента {
+  background-color: #eadcff;
+  color: #4b1f85;
+  border: 1px solid #dcc7ff;
+}
+
+.status-badge.status-completed,
+.status-badge.status-Завершена {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+/* === Приоритеты: пастельные бейджи (поддерживаем и код, и RU-имена) === */
+.priority-badge {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  font-size: 0.875em;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+}
+
+/* Низкий */
+.priority-badge.priority-low,
+.priority-badge.priority-Низкий {
+  background-color: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
+/* Обычный/Средний */
+.priority-badge.priority-medium,
+.priority-badge.priority-Обычный,
+.priority-badge.priority-Средний {
+  background-color: #fff3cd;
+  color: #856404;
+  border-color: #ffeeba;
+}
+
+/* Высокий */
+.priority-badge.priority-high,
+.priority-badge.priority-Высокий {
+  background-color: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb;
+}
+
+/* Критический */
+.priority-badge.priority-urgent,
+.priority-badge.priority-Критический {
+  background-color: #f1c0c5;
+  color: #5b0b13;
+  border-color: #e8a7ae;
+}
+
+/* Приоритет как текст (без плашки), но с теми же цветами */
+.priority-text{
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.priority-text.priority-low,
+.priority-text.priority-Низкий { color: #155724; }
+.priority-text.priority-medium,
+.priority-text.priority-Обычный,
+.priority-text.priority-Средний { color: #856404; }
+.priority-text.priority-high,
+.priority-text.priority-Высокий { color: #721c24; }
+.priority-text.priority-urgent,
+.priority-text.priority-Критический { color: #5b0b13; }
+
+/* === Единый стиль карточек/блоков по всему проекту === */
+.card {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Левый акцент как у "блоков" (не ломаем цветные bg- карточки) */
+.card:not([class*="bg-"]) {
+  border-left: 4px solid rgba(13,110,253,0.20);
+}
+
+.card-header {
+  background-color: rgba(248,249,250,0.8);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Таблицы в карточках выглядят одинаково */
+.table {
+  font-size: 0.875rem;
+}
+
+.status-badge.status-default {
+  background-color: #e9ecef;
+  color: #495057;
+  border: 1px solid #ced4da;
+}
+
+/* При наведении — чуть темнее */
+.status-badge:hover {
+  filter: brightness(0.95);
+}
+/* === ГЛОБАЛЬНО: уменьшаем базовый шрифт === */
+body {
+    font-size: 1rem; /* 14px вместо 16px */
+}
+
+/* === SIDEBAR: компактность и стиль === */
+.sidebar {
+    background-color: #fbfbfc;
+    border-right: 1px solid rgba(0,0,0,0.06);
+    width: 240px; /* чуть уже */
+    padding: 0.75rem 0.5rem; /* меньше padding */
+}
+
+.sidebar .logo-container img {
+    width: 100%;
+    display: block;
+}
+
+.sidebar .nav-link {
+    padding: 0.375rem 0.75rem; /* компактные пункты */
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    color: #333; /* чёрный текст, как ты просил */
+}
+
+/* Убираем синюю подсветку активного пункта */
+.sidebar .nav-link.active,
+.sidebar .nav-link.active:focus,
+.sidebar .nav-link.active:hover {
+    background-color: #e9ecef; /* светло-серый вместо синего */
+    color: #212529;
+    font-weight: 500;
+}
+
+/* Иконки крупнее (1.5–2×) */
+.sidebar .nav-link i.bi {
+    font-size: 1.35rem;
+    width: 1.6rem;
+    text-align: center;
+    margin-right: 0.5rem;
+}
+
+/* === ОСНОВНОЙ КОНТЕНТ: компактность === */
+.main-content-area {
+    background-color: #f8f9fa;
+    padding: 0.75rem; /* меньше отступы */
+}
+
+/* Заголовки тоже чуть мельче */
+h1, h2, h3, h4, h5, h6 {
+    font-size: 1.125rem; /* или ещё меньше при необходимости */
+}
+
+/* === BREADCRUMBS и таблицы — если есть === */
+.breadcrumb {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0;
+    margin-bottom: 0.75rem;
+}
+
+/* Убираем синие кнопки/акценты по умолчанию */
+.btn-primary {
+    --bs-btn-bg: #6c757d; /* серый вместо синего */
+    --bs-btn-border-color: #6c757d;
+    --bs-btn-hover-bg: #5a6268;
+    --bs-btn-hover-border-color: #545b62;
+}
+
+/* === HR — едва заметная === */
+hr {
+    opacity: 0.2;
+}
+/* Создание заявки create_manual_ticket.html*/
+
+/* === ФОРМЫ: уменьшенные контролы === */
+.form-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.form-control,
+.form-select {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    height: auto;
+    min-height: unset;
+}
+
+/* === КНОПКИ: стандартный размер, но чуть компактнее === */
+.btn {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    line-height: 1.3;
+}
+
+/* === Quill редактор: уменьшить высоту и шрифт === */
+#editor-container {
+    height: 250px; /* было 350px */
+    margin-bottom: 12px;
+    font-size: 0.8125rem;
+}
+
+.ql-toolbar {
+    padding: 0.25rem 0.375rem !important;
+    border-radius: 0.25rem 0.25rem 0 0 !important;
+}
+
+.ql-editor {
+    font-size: 0.8125rem !important;
+    padding: 0.5rem !important;
+    min-height: 150px !important;
+}
+
+/* === Ограничение изображений (оставляем как есть, но можно уменьшить до 60px по твоему требованию) === */
+.ql-editor img,
+.message-content img {
+    max-width: 60px !important; /* ← как ты просил ранее */
+    height: auto !important;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    margin: 0.25em 0;
+}
+
+/* === Подсказки под полями === */
+.form-text {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+/* === Загрузка файлов: компактный превью === */
+#uploadedFilesPreview .list-group-item {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+#uploadedFilesPreview .btn-sm {
+    padding: 0.125rem 0.25rem;
+    font-size: 0.75rem;
+}
+
+/* === Отступы между строками формы === */
+.row.mb-4,
+.mb-3 {
+    margin-bottom: 0.75rem !important;
+}
+/* === СТРАНИЦА ПРОФИЛЯ: компактный вид === */
+.profile-section .text-muted.small {
+    font-size: 0.75rem; /* 12px */
+    margin-bottom: 0.125rem;
+}
+
+.profile-section > div.d-flex {
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0.625rem !important;
+    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+}
+
+.profile-section > div.d-flex > div:first-child {
+    font-size: 0.875rem; /* 14px для значений */
+}
+
+.profile-section .btn-outline-primary.btn-sm {
+    font-size: 0.75rem;
+    padding: 0.1875rem 0.375rem;
+    line-height: 1.3;
+}
+
+/* === МОДАЛЬНЫЕ ОКНА: уменьшить отступы и шрифты === */
+.modal-content {
+    font-size: 0.875rem;
+}
+
+.modal-header,
+.modal-footer {
+    padding: 0.5rem 0.75rem;
+}
+
+.modal-body {
+    padding: 0.75rem;
+}
+
+.modal-title {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.modal .form-label {
+    font-size: 0.8125rem;
+    margin-bottom: 0.25rem;
+}
+
+.modal .form-control,
+.modal .form-select {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+    height: auto;
+}
+
+.modal .btn {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* === BADGE’ы в профиле (статусы) — чуть мельче === */
+.profile-section .badge {
+    font-size: 0.75rem;
+    padding: 0.25em 0.4em !important;
+}
+
+/* === Подпись под профилем (username/email) === */
+.profile-section .text-center.text-muted.small {
+    font-size: 0.75rem;
+    margin-top: 1rem;
+}
+/* === СТРАНИЦА ИНСТРУКЦИЙ === */
+.instructions-page h6 {
+    font-size: 0.9375rem;
+}
+
+.instructions-page .card {
+    font-size: 0.875rem;
+}
+
+.instructions-page .card-header {
+    padding: 0.375rem 0.5rem !important;
+}
+
+.instructions-page .card-body {
+    padding: 0.5rem !important;
+}
+
+.instructions-page .accordion-button {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.5rem !important;
+}
+
+.instructions-page .accordion-body {
+    font-size: 0.8125rem;
+}
+
+/* Бейджи шагов */
+.instructions-page .step-badge {
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+/* Индикаторы приоритета */
+.priority-indicator {
+    width: 4px;
+    height: 16px;
+    flex-shrink: 0;
+}
+.priority-high   { background-color: #dc3545; }
+.priority-medium { background-color: #fd7e14; }
+.priority-low    { background-color: #198754; }
+
+/* Уменьшить иконки */
+.instructions-page .bi {
+    font-size: 1rem;
+    color: #6c757d !important;
+}
+/* Настройки — компактный вид */
+.settings-page .nav-tabs .nav-link {
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.5rem;
+}
+.settings-page .btn-sm {
+    font-size: 0.8125rem;
+    padding: 0.1875rem 0.375rem;
+}
+.settings-page .form-label {
+    font-size: 0.8125rem;
+}
+.settings-page .table th,
+.settings-page .table td {
+    padding: 0.375rem 0.5rem;
+}
+/* === Цветные кружки приоритета — пастельные тона из таблицы === */
+.priority-badge {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+    background-color: #adb5bd; /* серый по умолчанию */
+}
+.priority-badge.high   { background-color: #f8d7da; }
+.priority-badge.medium { background-color: #fff3cd; }
+.priority-badge.low    { background-color: #d1e7dd; }
+
+/* === Страница деталей заявки === */
+.ticket-content .btn {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem;
+}
+.ticket-detail-page {
+  font-size: 0.875rem; /* 14px → 13px */
+}
+
+.ticket-detail-page .btn-sm {
+  font-size: 0.8125rem;
+  padding: 0.1875rem 0.375rem;
+  line-height: 1.3;
+}
+
+.ticket-detail-page .ticket-meta-item {
+  font-size: 0.875rem;
+}
+
+.ticket-detail-page .form-label,
+.ticket-detail-page .form-text {
+  font-size: 0.8125rem;
+}
+
+.ticket-detail-page .comment-header small,
+.ticket-detail-page .message-content {
+  font-size: 0.875rem;
+}
+
+/* Quill редактор */
+.ticket-detail-page .ql-editor {
+  font-size: 0.875rem !important;
+}
+
+/* ===== ЦВЕТА ДЛЯ ИСТОРИИ ===== */
+/* Статусы в истории */
+.history-status {
+    color: #2196f3 !important;  /* синий */
+}
+
+/* Приоритеты в истории */
+.history-priority {
+    color: #d68101 !important;  /* оранжевый */
+}
+
+/* Отделы в истории */
+.history-department {
+    color: #7d3d88 !important;  /* фиолетовый */
+}
+
+/* Обратная связь клиента */
+.history-feedback {
+    color: #3c973f !important;  /* зеленый */
+}
+/* Системные события */
+.history-back {
+    color: #aa3232 !important;  /* серый */
+}
+
+/* Системные события */
+.history-system {
+    color: #6d6c6c !important;  /* серый */
+}
+/* Минималистичный стиль */
+.alert-pinned-minimal {
+    background: #fafafa !important;
+    border: 1px solid #eaeaea !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+    margin-bottom: 12px !important;
+    font-size: 0.8rem !important;
+    line-height: 1.3 !important;
+}
+
+.alert-pinned-minimal .pinned-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.alert-pinned-minimal .bi-pin-fill {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.alert-pinned-minimal .pinned-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #444;
+    margin: 0;
+}
+
+.alert-pinned-minimal .pinned-content {
+    font-size: 0.78rem;
+    color: #333;
+    margin: 4px 0;
+}
+
+.alert-pinned-minimal .pinned-meta {
+    font-size: 0.7rem;
+    color: #777;
+    display: flex;
+    gap: 12px;
+}
+
+.alert-pinned-minimal .btn-unpin {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.3rem;
+    border: none;
+    background: transparent;
+    color: #999;
+}
+
+.alert-pinned-minimal .btn-unpin:hover {
+    color: #666;
+    background: rgba(0,0,0,0.05);
+}
+/* Уменьшаем ВСЕ кнопки с классом .btn-sm */
+.btn-sm {
+  font-size: 0.75rem !important;      /* 12px */
+  padding: 0.15rem 0.4rem !important; /* компактные отступы */
+  line-height: 1.3 !important;
+  min-height: auto !important;
+  height: auto !important;
+  border-radius: 0.2rem !important;   /* чуть острее углы */
+}
+.status-waiting {
+  background-color: #fff3cd !important;
+  color: #856404 !important;
+  border: 1px solid #ffeaa7 !important;
+  padding: 2px 6px !important;
+  font-size: 0.7rem !important;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.toast {
+  min-width: 280px;
+  max-width: 360px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: 8px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast .toast-body {
+  padding: 12px 16px;
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+}
+
+.toast .toast-body i {
+  margin-right: 8px;
+  font-size: 1.1rem;
+}
+/* === Всплывающий мультиселект === */
+.multiselect-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-width: 240px;
+}
+
+.multiselect-trigger {
+  width: 100%;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  background-color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.multiselect-trigger .selected-count {
+  background-color: #e9ecef;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 0.7rem;
+  min-width: 20px;
+  text-align: center;
+}
+
+.multiselect-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 1000;
+  display: none;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.multiselect-dropdown.open {
+  display: block;
+}
+
+.multiselect-option {
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.multiselect-option:hover {
+  background-color: #f8f9fa;
+}
+
+.multiselect-option input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.multiselect-placeholder {
+  padding: 0.3rem 0.6rem;
+  color: #6c757d;
+  font-size: 0.75rem;
+}

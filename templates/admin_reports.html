@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Отчёты{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics.css') }}">
+{% endblock %}
+
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<div class="page-container">
+
+  <div class="page-toolbar">
+    <div class="page-title">
+      <i class="bi bi-clipboard-data"></i>
+      <span>Отчёты</span>
+    </div>
+    <div class="page-actions">
+      <a class="btn btn-action" href="{{ url_for('admin_statistics', period=period, department_id=department_id or '', operator_id=operator_id or '', date_from=date_from, date_to=date_to) }}">
+        <i class="bi bi-speedometer2"></i> Статистика
+      </a>
+      <a class="btn btn-action-primary" href="{{ url_for('admin_reports_export_xlsx', period=period, department_id=department_id or '', operator_id=operator_id or '', date_from=date_from, date_to=date_to, view=report_view) }}">
+        <i class="bi bi-file-earmark-excel"></i> Excel (до 500 строк)
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><i class="bi bi-funnel"></i> Фильтры</div>
+    <div class="card-body">
+      <form method="get">
+        <div class="filters-grid">
+          <div>
+            <label class="form-label">Период</label>
+            <select class="form-select" name="period" id="periodSelect">
+              <option value="7"  {% if period == '7' %}selected{% endif %}>7 дней</option>
+              <option value="30" {% if period == '30' %}selected{% endif %}>30 дней</option>
+              <option value="90" {% if period == '90' %}selected{% endif %}>90 дней</option>
+              <option value="365" {% if period == '365' %}selected{% endif %}>365 дней</option>
+              <option value="custom" {% if period == 'custom' %}selected{% endif %}>Свой период</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Отдел</label>
+            <select class="form-select" name="department_id">
+              <option value="">Все отделы</option>
+              {% for d in all_departments %}
+                <option value="{{ d.id }}" {% if department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Оператор</label>
+            <select class="form-select" name="operator_id">
+              <option value="">Все</option>
+              {% for u in operators %}
+                <option value="{{ u.id }}" {% if operator_id == u.id %}selected{% endif %}>{{ u.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Дата от</label>
+            <input class="form-control" type="date" name="date_from" id="dateFrom" value="{{ date_from }}">
+          </div>
+
+          <div>
+            <label class="form-label">Дата до</label>
+            <input class="form-control" type="date" name="date_to" id="dateTo" value="{{ date_to }}">
+          </div>
+
+          <div style="display:flex;gap:10px;justify-content:flex-end;align-items:flex-end">
+            <select class="form-select" name="view" style="max-width:200px">
+              <option value="created" {% if report_view == 'created' %}selected{% endif %}>Созданные</option>
+              <option value="resolved" {% if report_view == 'resolved' %}selected{% endif %}>Закрытые</option>
+            </select>
+            <button class="btn btn-action-primary" type="submit"><i class="bi bi-check2"></i> Применить</button>
+          </div>
+        </div>
+        <div style="margin-top:10px;color:var(--muted);font-size:.86rem">
+          Период: <strong>{{ period_label }}</strong> · Режим: <strong>{{ report_view_label }}</strong> · В таблице: <strong>{{ export_rows|length }}</strong>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">Создано</div>
+          <div class="metric-value">{{ sla_metrics.created_count }}</div>
+        </div>
+        <div class="metric-ico"><i class="bi bi-plus-circle"></i></div>
+      </div>
+      <div class="metric-sub">Закрыто: <strong>{{ sla_metrics.resolved_count }}</strong> · Net: <strong>{{ sla_metrics.net_flow }}</strong></div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">Сроки (SLA) — закрытые</div>
+          <div class="metric-value">{{ sla_compliance_percent }}%</div>
+        </div>
+        <div class="metric-ico success"><i class="bi bi-shield-check"></i></div>
+      </div>
+      <div class="metric-sub">SLA решения: {{ sla_metrics.on_time }} · Просрочено: {{ sla_metrics.overdue_completed }}{% if sla_v2 %} · Первый ответ: {{ sla_v2.first_response_percent }}%{% endif %}</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-top">
+        <div>
+          <div class="metric-label">FRT / Resolve</div>
+          <div class="metric-value">{{ sla_metrics.frt_avg }}</div>
+        </div>
+        <div class="metric-ico"><i class="bi bi-chat-left-dots"></i></div>
+      </div>
+      <div class="metric-sub">Среднее время решения (MTTR): <strong>{{ sla_metrics.avg_time_to_resolve }}</strong></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Таблица отчёта (последние {{ export_rows|length }})</div>
+    <div class="card-body" style="padding:0">
+      <div class="table-responsive reports-table-wrap">
+        <table class="table table-hover table-compact reports-table">
+          <thead>
+            <tr>
+              <th style="width:70px">ID</th>
+              <th>Тема</th>
+              <th style="width:160px">Статус</th>
+              <th style="width:220px">Отдел</th>
+              <th style="width:180px">Оператор</th>
+              <th style="width:140px">Создано</th>
+              <th style="width:140px">Закрыто</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in export_rows %}
+            <tr {% if t.overdue_now %}style="background: color-mix(in oklab, var(--danger) 10%, transparent);"{% endif %}>
+              <td>#{{ t.id }}</td>
+              <td>
+                <a href="{{ url_for('ticket_detail', ticket_id=t.id) }}"><strong>{{ t.subject }}</strong></a>
+                <div style="color:var(--muted);font-size:.85rem;margin-top:2px">
+                  Приоритет: <strong>{{ t.priority }}</strong>
+                  {% if t.sla_deadline %} · Сроки (SLA): <strong>{{ t.sla_deadline }}</strong>{% endif %}
+                  {% if t.sla_breached == 'Да' %} · <span class="badge pill" style="border-color: color-mix(in oklab, var(--danger) 40%, var(--border)); color: var(--danger);">Нарушен SLA</span>{% endif %}
+                </div>
+              </td>
+              <td><span class="badge pill">{{ t.status }}</span></td>
+              <td>{{ t.department }}</td>
+              <td>{{ t.operator }}</td>
+              <td>{{ t.created_at }}</td>
+              <td>{{ t.resolved_at }}</td>
+            </tr>
+            {% endfor %}
+            {% if export_rows|length == 0 %}
+            <tr><td colspan="7" style="padding:18px;color:var(--muted)">Нет данных за выбранный период.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="analytics-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-header">Шаг 9 · Топ клиентов по инцидентам</div>
+      <div class="card-body">
+        {% for row in step9.top_clients %}
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);">
+            <span>{{ row.name }}{% if row.inn %} · {{ row.inn }}{% endif %}</span>
+            <strong>{{ row.tickets }}</strong>
+          </div>
+        {% endfor %}
+        {% if not step9.top_clients %}<div style="color:var(--muted)">Нет данных.</div>{% endif %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Шаг 9 · Reopen rate и причины закрытия</div>
+      <div class="card-body">
+        <div style="margin-bottom:12px;"><strong>{{ step9.reopen_rate }}%</strong> · переоткрыто {{ step9.reopened_count }} из {{ step9.closed_count }}</div>
+        {% for row in step9.top_close_reasons %}
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><span>{{ row.reason }}</span><strong>{{ row.count }}</strong></div>
+        {% endfor %}
+        {% if not step9.top_close_reasons %}<div style="color:var(--muted)">Нет данных.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Даты доступны всегда. Чтобы применить выбранные даты, выберите "Свой период".
+
+  // auto switch to custom period when user picks dates
+  (function(){
+    const period = document.getElementById('reportPeriod');
+    const df = document.getElementById('reportFrom');
+    const dt = document.getElementById('reportTo');
+    function autoCustom(){
+      if (period && period.value !== 'custom'){
+        period.value = 'custom';
+      }
+    }
+    if (df) df.addEventListener('change', autoCustom);
+    if (dt) dt.addEventListener('change', autoCustom);
+  })();
+</script>
+  </section>
+</div>
+{% endblock %}

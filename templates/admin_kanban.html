@@ -1,0 +1,694 @@
+{% extends "base.html" %}
+{% from 'partials/svg.html' import svg %}
+
+{% block title %}Канбан — Техподдержка{% endblock %}
+
+{% block content %}
+
+<div class="kanban-toolbar-shell">
+  <div class="ticketlist-actions kanban-toolbar-main">
+    <div class="kanban-toolbar-left">
+      <button class="btn btn-ghost btn-sm" type="button" id="filterToggle" aria-expanded="false" aria-controls="filterPanel">
+        <i class="bi bi-funnel"></i> Настройка фильтрации
+      </button>
+      <div class="kanban-quick-filters" id="kanbanQuickFilters">
+        <button type="button" class="kanban-chip is-active" data-quick="active">Активные</button>
+        <button type="button" class="kanban-chip" data-quick="new">Новые</button>
+        <button type="button" class="kanban-chip" data-quick="control">На контроле SLA</button>
+        <button type="button" class="kanban-chip" data-quick="completed">Завершённые</button>
+      </div>
+    </div>
+    <div class="kanban-toolbar-right">
+      <div class="kanban-board-note">Завершённые скрыты по умолчанию</div>
+    </div>
+  </div>
+
+  <div class="filter-wrapper">
+  <div id="filterPanel" class="filter-panel" aria-hidden="true">
+    <form class="filter-form" onsubmit="return false;">
+      <div class="filter-grid">
+        <div class="field">
+          <label>Отделы</label>
+          <div class="multiselect-wrapper">
+            <div class="multiselect-trigger" id="deptTrigger">
+              <span class="selected-text">Все отделы</span>
+              <span class="selected-count">0</span>
+              <i class="bi bi-chevron-down"></i>
+            </div>
+            <div class="multiselect-dropdown" id="kanban-dept-dropdown">
+              {% for dept in departments %}
+                <label class="multiselect-option">
+                  <input type="checkbox" name="department" value="{{ dept.id }}"> {{ dept.name }}
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Статусы</label>
+          <div class="multiselect-wrapper">
+            <div class="multiselect-trigger" id="statusTrigger">
+              <span class="selected-text">Все статусы</span>
+              <span class="selected-count">0</span>
+              <i class="bi bi-chevron-down"></i>
+            </div>
+            <div class="multiselect-dropdown" id="kanban-status-dropdown">
+              <label class="multiselect-option">
+                <input type="checkbox" name="status" value="Новая"> Новая
+              </label>
+              <label class="multiselect-option">
+                <input type="checkbox" name="status" value="Принята"> Принята
+              </label>
+              <label class="multiselect-option">
+                <input type="checkbox" name="status" value="В работе"> В работе
+              </label>
+              <label class="multiselect-option">
+                <input type="checkbox" name="status" value="Ожидает подтверждения клиента"> На подтверждении
+              </label>
+              <label class="multiselect-option">
+                <input type="checkbox" name="status" value="Завершена"> Завершена
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>SLA</label>
+          <select id="slaFilter" class="select">
+            <option value="">Все SLA</option>
+            <option value="normal">В срок</option>
+            <option value="warning">Менее 4 часов</option>
+            <option value="overdue">Просрочено</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <button type="button" class="btn btn-primary btn-sm" id="refreshBtn">
+          {{ svg('check','ico') }}Обновить
+        </button>
+        <button class="btn btn-ghost btn-sm" type="button" id="clearKanbanFilters">Очистить</button>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+<!-- Kanban Board -->
+<div id="kanbanBoard" class="kanban-container bitrix-kanban">
+  <!-- Колонки будут добавлены сюда через JS -->
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+:root{
+  --kanban-col-width: 0px;
+}
+
+.kanban-toolbar-shell{display:grid;gap:4px;margin-bottom:4px}
+.filter-wrapper{margin:0}
+.filter-wrapper .filter-panel{margin-top:0;border-radius:12px}
+.kanban-toolbar-main{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border);border-radius:12px;background:color-mix(in oklab, var(--surface) 90%, transparent)}
+
+.kanban-toolbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.kanban-toolbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.kanban-board-note{font-size:.72rem;color:var(--muted)}
+.kanban-quick-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kanban-chip{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.78rem;font-weight:650;transition:all .12s ease}
+.kanban-chip:hover{border-color:color-mix(in oklab, var(--accent) 40%, var(--border));transform:translateY(-1px)}
+.kanban-chip.is-active{background:color-mix(in oklab, var(--accent) 14%, var(--surface));border-color:color-mix(in oklab, var(--accent) 38%, var(--border));color:var(--accent)}
+
+/* === Цвета шапок колонок для светлой/тёмной темы === */
+.col-bg-attention{--kanban-header-bg:#fff7d6;--kanban-header-fg:#5f4a12;--kanban-accent:#e5cc75}
+.col-bg-first-line{--kanban-header-bg:#eaf3ff;--kanban-header-fg:#24446f;--kanban-accent:#b9d4fb}
+.col-bg-second-line{--kanban-header-bg:#e8f8ef;--kanban-header-fg:#2f5a43;--kanban-accent:#b7e1c4}
+.col-bg-hardware{--kanban-header-bg:#f2eaff;--kanban-header-fg:#59407f;--kanban-accent:#d5baf6}
+.col-bg-network{--kanban-header-bg:#fdecef;--kanban-header-fg:#7b4150;--kanban-accent:#f3bfcb}
+.col-bg-sed{--kanban-header-bg:#fff2dd;--kanban-header-fg:#7a5621;--kanban-accent:#efcca0}
+.col-bg-monitoring{--kanban-header-bg:#e7f7f0;--kanban-header-fg:#2f5f54;--kanban-accent:#b8e1d0}
+.col-bg-security{--kanban-header-bg:#efe9ff;--kanban-header-fg:#574b7c;--kanban-accent:#cec2f4}
+.col-bg-default{--kanban-header-bg:#f3f4f6;--kanban-header-fg:#4b5563;--kanban-accent:#d3d8e0}
+
+html[data-theme="dark"] .col-bg-attention{--kanban-header-bg:#2f2a16;--kanban-header-fg:#f0e3b1;--kanban-accent:#8e7b42}
+html[data-theme="dark"] .col-bg-first-line{--kanban-header-bg:#1f2736;--kanban-header-fg:#d8e6fb;--kanban-accent:#50607f}
+html[data-theme="dark"] .col-bg-second-line{--kanban-header-bg:#1b2d25;--kanban-header-fg:#d2ecdc;--kanban-accent:#4e725d}
+html[data-theme="dark"] .col-bg-hardware{--kanban-header-bg:#2b2136;--kanban-header-fg:#e6dbfb;--kanban-accent:#6a5a86}
+html[data-theme="dark"] .col-bg-network{--kanban-header-bg:#2e1f24;--kanban-header-fg:#f2dce2;--kanban-accent:#7a5661}
+html[data-theme="dark"] .col-bg-sed{--kanban-header-bg:#2f2518;--kanban-header-fg:#f3e0bf;--kanban-accent:#8b6a3e}
+html[data-theme="dark"] .col-bg-monitoring{--kanban-header-bg:#1a2d28;--kanban-header-fg:#d5eee5;--kanban-accent:#56776c}
+html[data-theme="dark"] .col-bg-security{--kanban-header-bg:#261f36;--kanban-header-fg:#e4ddf7;--kanban-accent:#6b6188}
+html[data-theme="dark"] .col-bg-default{--kanban-header-bg:#272c34;--kanban-header-fg:#dde3eb;--kanban-accent:#5f6a78}
+
+#kanbanBoard{display:grid;grid-template-columns:repeat(1,minmax(0,1fr));gap:8px;align-items:start;padding:2px 0 10px;overflow:visible;width:100%}
+.kanban-col{display:flex;flex-direction:column;min-width:0;max-height:calc(100vh - 198px);min-height:560px;border-radius:12px;overflow:hidden;background:color-mix(in oklab, var(--surface) 96%, transparent);border:1px solid color-mix(in oklab, var(--kanban-accent, var(--border)) 18%, var(--border));border-left:none;box-shadow:none}
+.kanban-col-header{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px 9px 7px;border-bottom:1px solid color-mix(in oklab, var(--kanban-accent, var(--border)) 26%, var(--border));background:var(--kanban-header-bg, var(--surface)) !important;color:var(--kanban-header-fg, var(--text))}
+.kanban-col-title-wrap{min-width:0;display:grid;gap:2px}
+.kanban-col-title{font-size:.77rem;font-weight:700;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kanban-col-subtitle{font-size:.66rem;color:color-mix(in oklab, var(--kanban-header-fg, var(--text)) 68%, transparent)}
+.kanban-col-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:color-mix(in oklab, var(--kanban-header-fg, var(--text)) 14%, transparent);border:1px solid color-mix(in oklab, var(--kanban-header-fg, var(--text)) 18%, transparent);font-size:.68rem;font-weight:700;color:var(--kanban-header-fg, var(--text));box-shadow:none}
+.kanban-col-body{padding:5px;overflow-y:auto;display:grid;align-content:start;gap:6px;background:transparent}
+.kanban-group-title{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:6px;margin:1px 0 0;padding:3px 2px 1px;font-size:.63rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in oklab, var(--text) 58%, transparent);background:linear-gradient(180deg,color-mix(in oklab, var(--surface) 97%, transparent) 0%,color-mix(in oklab, var(--surface) 90%, transparent) 100%)}
+.kanban-group-title::after{content:'';flex:1 1 auto;height:1px;background:color-mix(in oklab, var(--border) 86%, transparent)}
+.kanban-empty{display:grid;place-items:center;min-height:110px;padding:18px 10px;border:1px dashed rgba(255,255,255,.1);border-radius:12px;color:var(--muted);font-size:.74rem;background:transparent}
+
+.ticket-card{position:relative;margin:0;padding:8px 9px 7px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;color:#1f2937;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease}
+.ticket-card:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(0,0,0,.10);border-color:color-mix(in oklab, var(--accent) 20%, var(--border))}
+.ticket-card.is-dragging{opacity:.92;transform:rotate(1deg);box-shadow:0 18px 28px rgba(0,0,0,.18)}
+.kanban-drop-zone{border:1px dashed color-mix(in oklab, var(--accent) 50%, var(--border));background:color-mix(in oklab, var(--accent) 8%, var(--surface));border-radius:14px;margin:0;height:80px}
+
+.ticket-card-top{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;align-items:start}
+.ticket-title-wrap{min-width:0;display:grid;gap:5px}
+.ticket-meta-top{display:flex;align-items:center;justify-content:space-between;gap:6px;padding-right:24px}
+.ticket-id-line{display:flex;align-items:center;gap:7px;min-width:0}
+.ticket-id{font-size:.74rem;font-weight:800;letter-spacing:.01em;color:#111827}
+.ticket-date{font-size:.68rem;color:#6b7280;white-space:nowrap}
+.ticket-title-line{display:flex;align-items:flex-start;gap:6px}
+.ticket-subject{margin:0 !important;font-size:.8rem !important;line-height:1.22;font-weight:760;color:#1f2937;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ticket-priority{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:18px;height:18px;margin-top:1px;color:#ef4444}
+.ticket-side{display:grid;gap:6px;justify-items:end;align-content:start}
+.ticket-unread{position:absolute;top:7px;right:7px;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#ef4444;border:1px solid #ef4444;font-size:.66rem;font-weight:800;color:#fff}
+.ticket-unread.is-hidden{display:none}
+.ticket-sla-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ticket-sla-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;border:1px solid #e5e7eb;font-size:.65rem;font-weight:750;white-space:nowrap;background:#f3f4f6;color:#374151}
+.ticket-sla-badge.sla-ok,.ticket-sla-badge.sla-warning{background:#ecfdf5;border-color:#bbf7d0;color:#166534}
+.ticket-sla-badge.sla-overdue{background:#fee2e2;border-color:#fecaca;color:#b91c1c}
+.ticket-sla-badge.is-hidden{display:none}
+.ticket-bottom{display:flex;align-items:center;justify-content:flex-start;gap:6px;margin-top:6px}
+.ticket-presence{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;border:1px solid #d1d5db;background:#f3f4f6;color:#6b7280;font-size:.85rem}
+.ticket-presence.is-active{color:#2563eb;border-color:#93c5fd;background:#eff6ff}
+.ticket-presence.is-hidden{display:none}
+
+html[data-theme="dark"] .ticket-card{background:#fff !important;color:#1f2937 !important}
+html[data-theme="dark"] .ticket-subject, html[data-theme="dark"] .ticket-id{color:#111827 !important}
+html[data-theme="dark"] .ticket-date{color:#6b7280 !important}
+
+@media (max-width: 1400px){
+  #kanbanBoard{grid-template-columns:repeat(4,minmax(0,1fr)) !important;overflow-x:auto;padding-bottom:12px}
+  .kanban-col{min-width:220px}
+}
+
+@media (max-width: 1023px){
+  #kanbanBoard{display:flex;flex-wrap:nowrap;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .kanban-col{flex:0 0 280px;min-width:280px;max-height:none;min-height:500px}
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+let allTickets = {};
+let departments = {{ departments | tojson }};
+let sortableInstances = {};
+let currentUserIsAdmin = {{ 'true' if current_user.role == 'admin' else 'false' }};
+let currentUserIsFirstLine = {{ 'true' if current_user.department and current_user.department.id == 2 else 'false' }};
+let activeQuickFilter = 'active';
+let includeCompleted = false;
+let suppressCardClickUntil = 0;
+
+const FIRE_SVG = {{ svg('fire','ico ico-fire')|tojson }};
+const PRESENCE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.33 0-6 1.67-6 3.73V20h12v-2.27C18 15.67 15.33 14 12 14Z"/></svg>';
+
+const departmentBgClasses = {
+  "Требуется обработка": "col-bg-attention",
+  "1ая линия ТП": "col-bg-first-line",
+  "2ая линия ТП": "col-bg-second-line",
+  "Отдел аппаратного обеспечения": "col-bg-hardware",
+  "Отдел сетевого обеспечения": "col-bg-network",
+  "СЭД ДЕЛО": "col-bg-sed",
+  "Отдел мониторинга": "col-bg-monitoring",
+  "Отдел информационной безопасности": "col-bg-security"
+};
+
+function sortDepartments(depts) {
+  const attention = depts.find(d => d.name === "Требуется обработка");
+  return attention ? [attention, ...depts.filter(d => d.name !== "Требуется обработка")] : depts;
+}
+
+function getStatusBadgeClass(status) {
+  if (status === "Новая") return 'status-new';
+  if (status === "Принята") return 'status-accepted';
+  if (status === "В работе") return 'status-inwork';
+  if (status === "Завершена") return 'status-completed';
+  if (status === "Спам") return 'status-spam';
+  if (status === "Дубликат") return 'status-duplicate';
+  if (status === "Ошибочная") return 'status-mistake';
+  if (status === "Ожидает подтверждения клиента") return 'status-wait_client';
+  return 'status-default';
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getColumnSubtitle(tickets) {
+  if (!tickets.length) return 'Нет заявок';
+  const fresh = tickets.filter(t => t.status === 'Новая').length;
+  return fresh ? `Новых: ${fresh}` : 'Рабочая очередь';
+}
+
+function getTicketTimestamp(ticket) {
+  const source = ticket.updated_at || ticket.created_at || ticket.created_date || '';
+  const normalized = String(source).replace(' ', 'T');
+  const ts = Date.parse(normalized);
+  return Number.isNaN(ts) ? 0 : ts;
+}
+
+function getTicketGroup(ticket) {
+  if (ticket.status === 'Новая') return 'new';
+  const ts = getTicketTimestamp(ticket);
+  if (!ts) return 'old';
+  const now = new Date();
+  const current = new Date(ts);
+  const sameDay = current.getFullYear() === now.getFullYear()
+    && current.getMonth() === now.getMonth()
+    && current.getDate() === now.getDate();
+  return sameDay ? 'today' : 'old';
+}
+
+function renderTicketGroups(body, tickets) {
+  const groups = [
+    { key: 'new', label: 'Новые' },
+    { key: 'today', label: 'Сегодня' },
+    { key: 'old', label: 'Старые' }
+  ];
+  const grouped = { new: [], today: [], old: [] };
+  tickets.forEach(ticket => {
+    const key = getTicketGroup(ticket);
+    grouped[key] = grouped[key] || [];
+    grouped[key].push(ticket);
+  });
+
+  let hasAny = false;
+  groups.forEach(group => {
+    const items = grouped[group.key] || [];
+    if (!items.length) return;
+    hasAny = true;
+    const title = document.createElement('div');
+    title.className = 'kanban-group-title';
+    title.textContent = group.label;
+    body.appendChild(title);
+    items.forEach(ticket => body.appendChild(createTicketCard(ticket)));
+  });
+  return hasAny;
+}
+
+function compareTickets(a, b) {
+  const aFresh = a.status === 'Новая' ? 1 : 0;
+  const bFresh = b.status === 'Новая' ? 1 : 0;
+  if (aFresh !== bFresh) return bFresh - aFresh;
+
+  const timeDiff = getTicketTimestamp(b) - getTicketTimestamp(a);
+  if (timeDiff !== 0) return timeDiff;
+
+  const score = (ticket) => {
+    let result = 0;
+    if (ticket.sla_status === 'overdue') result += 50;
+    if (ticket.is_important) result += 20;
+    result += Math.min(Number(ticket.opchat_unread || 0), 20);
+    return result;
+  };
+  const diff = score(b) - score(a);
+  if (diff !== 0) return diff;
+  return Number(b.id || 0) - Number(a.id || 0);
+}
+
+function getSelectedStatuses() {
+  return Array.from(document.querySelectorAll('#kanban-status-dropdown input:checked')).map(cb => cb.value);
+}
+
+function setSelectedStatuses(values) {
+  const selected = new Set(values || []);
+  document.querySelectorAll('#kanban-status-dropdown input[type="checkbox"]').forEach(cb => {
+    cb.checked = selected.has(cb.value);
+  });
+  updateTriggerLabel('status');
+}
+
+function syncQuickFilterChips() {
+  const selectedStatuses = getSelectedStatuses();
+  document.querySelectorAll('.kanban-chip').forEach(btn => {
+    if (btn.dataset.quick === 'completed') {
+      btn.classList.toggle('is-active', includeCompleted || selectedStatuses.includes('Завершена'));
+    } else {
+      btn.classList.toggle('is-active', btn.dataset.quick === activeQuickFilter);
+    }
+  });
+  const note = document.querySelector('.kanban-board-note');
+  if (note) {
+    note.textContent = (includeCompleted || selectedStatuses.includes('Завершена'))
+      ? 'Завершённые показываются вместе с остальными заявками'
+      : 'Завершённые скрыты по умолчанию';
+  }
+}
+
+function setQuickFilter(filterName) {
+  if (filterName === 'completed') {
+    includeCompleted = !includeCompleted;
+    syncQuickFilterChips();
+    renderKanban();
+    return;
+  }
+
+  activeQuickFilter = filterName;
+  if (filterName === 'new') {
+    setSelectedStatuses(['Новая']);
+  } else {
+    setSelectedStatuses([]);
+  }
+  const sla = document.getElementById('slaFilter');
+  if (sla) {
+    sla.value = filterName === 'control' ? 'warning' : '';
+  }
+  syncQuickFilterChips();
+  renderKanban();
+}
+
+function getFilteredTickets() {
+  const selectedDeptIds = Array.from(document.querySelectorAll('#kanban-dept-dropdown input:checked')).map(cb => cb.value);
+  const selectedStatuses = getSelectedStatuses();
+  const slaFilter = document.getElementById('slaFilter')?.value || '';
+  const allVisibleTickets = [];
+
+  for (const deptId in allTickets) {
+    const dept = departments.find(d => d.id == deptId);
+    if (!dept) continue;
+    if (selectedDeptIds.length > 0 && !selectedDeptIds.includes(deptId)) continue;
+
+    allTickets[deptId].forEach(ticket => {
+      const isCompleted = ticket.status === 'Завершена';
+      if (selectedStatuses.length > 0) {
+        if (!selectedStatuses.includes(ticket.status)) return;
+      } else if (isCompleted && !includeCompleted) {
+        return;
+      }
+      const ticketSla = ticket.sla_status || 'normal';
+      if (slaFilter && ticketSla !== slaFilter) return;
+      allVisibleTickets.push({ ...ticket, department_id: parseInt(deptId, 10) });
+    });
+  }
+  return allVisibleTickets;
+}
+
+function renderKanban() {
+  const container = document.getElementById('kanbanBoard');
+  container.innerHTML = '';
+  const visibleTickets = getFilteredTickets();
+  const grouped = {};
+  visibleTickets.forEach(ticket => {
+    if (!grouped[ticket.department_id]) grouped[ticket.department_id] = [];
+    grouped[ticket.department_id].push(ticket);
+  });
+
+  const selectedDeptIds = Array.from(document.querySelectorAll('#kanban-dept-dropdown input:checked')).map(cb => cb.value);
+  const selectedStatuses = getSelectedStatuses();
+  const slaFilter = document.getElementById('slaFilter')?.value || '';
+  let deptsToShow = departments;
+
+  if (selectedDeptIds.length > 0) {
+    deptsToShow = departments.filter(d => selectedDeptIds.includes(String(d.id)));
+  } else if (selectedStatuses.length > 0 || slaFilter) {
+    const ids = Object.keys(grouped).map(id => parseInt(id, 10));
+    deptsToShow = departments.filter(d => ids.includes(d.id));
+  }
+  deptsToShow = sortDepartments(deptsToShow);
+
+  if (window.innerWidth > 1023) {
+    container.style.setProperty('--kanban-cols', String(Math.max(deptsToShow.length, 1)));
+    container.style.gridTemplateColumns = `repeat(${Math.max(deptsToShow.length, 1)}, minmax(0, 1fr))`;
+  } else {
+    container.style.removeProperty('--kanban-cols');
+    container.style.gridTemplateColumns = '';
+  }
+
+  deptsToShow.forEach(dept => {
+    const tickets = (grouped[dept.id] || []).sort(compareTickets);
+    const col = document.createElement('div');
+    col.className = `kanban-col ${departmentBgClasses[dept.name] || 'col-bg-default'}`;
+    col.innerHTML = `
+      <div class="kanban-col-header">
+        <div class="kanban-col-title-wrap">
+          <span class="kanban-col-title">${escapeHtml(dept.name)}</span>
+          <span class="kanban-col-subtitle">${escapeHtml(getColumnSubtitle(tickets))}</span>
+        </div>
+        <span class="kanban-col-count">${tickets.length}</span>
+      </div>
+      <div class="kanban-col-body" id="col-${dept.id}" data-dept-id="${dept.id}"></div>`;
+    container.appendChild(col);
+
+    const body = col.querySelector('.kanban-col-body');
+    if (!tickets.length || !renderTicketGroups(body, tickets)) {
+      const empty = document.createElement('div');
+      empty.className = 'kanban-empty';
+      empty.textContent = 'Нет заявок';
+      body.appendChild(empty);
+    }
+
+    if (sortableInstances[dept.id]) sortableInstances[dept.id].destroy();
+    let group = 'kanban';
+    if (!currentUserIsAdmin && currentUserIsFirstLine) {
+      group = {
+        name: 'restricted-kanban',
+        pull: (to, from) => [1,2].includes(parseInt(from.el.dataset.deptId, 10)),
+        put: (to) => parseInt(to.el.dataset.deptId, 10) !== 1
+      };
+    }
+
+    sortableInstances[dept.id] = new Sortable(body, {
+      group,
+      draggable: '.ticket-card',
+      filter: '.kanban-group-title, .kanban-empty',
+      preventOnFilter: false,
+      animation: 140,
+      ghostClass: 'kanban-drop-zone',
+      dragClass: 'is-dragging',
+      emptyInsertThreshold: 12,
+      onStart: () => body.querySelector('.kanban-empty')?.remove(),
+      onEnd: function(evt) {
+        suppressCardClickUntil = Date.now() + 350;
+        const tid = parseInt(evt.item.dataset.ticketId, 10);
+        const newDid = parseInt(evt.to.dataset.deptId, 10);
+        const oldDid = parseInt(evt.from.dataset.deptId, 10);
+        if (newDid !== oldDid) updateTicketDepartment(tid, newDid, oldDid);
+        else renderKanban();
+      }
+    });
+  });
+}
+
+function createTicketCard(ticket) {
+  const card = document.createElement('div');
+  card.className = 'ticket-card';
+  card.dataset.ticketId = ticket.id;
+
+  const unread = Number(ticket.opchat_unread || 0);
+  const presenceNames = Array.isArray(ticket.presence_names) ? ticket.presence_names : [];
+  const presenceTitle = presenceNames.length ? `В заявке: ${presenceNames.join(', ')}` : 'Сейчас никто не в заявке';
+  const ticketNumber = String(ticket.id ?? '');
+  const createdLabel = ticket.created_date || ticket.created_at || '';
+  const slaText = (ticket.sla_hint || '').trim();
+
+  card.innerHTML = `
+    <span class="ticket-unread ${unread ? '' : 'is-hidden'}" title="Новых сообщений: ${unread}">${unread || ''}</span>
+    <div class="ticket-card-top">
+      <div class="ticket-title-wrap">
+        <div class="ticket-meta-top">
+          <div class="ticket-id-line">
+            <span class="state-indicator ${ticket.indicator||'green'}" title="${escapeHtml(ticket.indicator_title||'')}"></span>
+            <span class="ticket-id">#${escapeHtml(ticketNumber)}</span>
+          </div>
+          <div class="ticket-date">${escapeHtml(createdLabel)}</div>
+        </div>
+        <div class="ticket-title-line">
+          <div class="ticket-subject">${escapeHtml(ticket.subject || '')}</div>
+          ${ticket.is_important ? `<span class="ticket-priority" title="Важная заявка">${FIRE_SVG}</span>` : ''}
+        </div>
+        <div class="ticket-sla-row">
+          <span class="ticket-sla-badge ${ticket.sla_status ? `sla-${ticket.sla_status}` : ''} ${slaText ? '' : 'is-hidden'}" title="SLA">${escapeHtml(slaText)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="ticket-bottom">
+      <span class="ticket-presence ${presenceNames.length ? 'is-active' : 'is-hidden'}" title="${escapeHtml(presenceTitle)}">${PRESENCE_SVG}</span>
+    </div>`;
+
+  card.addEventListener('click', (event) => {
+    if (Date.now() < suppressCardClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    if (event.target.closest('.ticket-presence')) return;
+    location.href = `/ticket/${ticket.id}`;
+  });
+  return card;
+}
+
+function updateTicketDepartment(ticketId, newDeptId, oldDeptId) {
+  fetch(`/api/kanban/ticket/${ticketId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ department_id: newDeptId })
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      let ticket = null;
+      if (oldDeptId && allTickets[oldDeptId]) {
+        const idx = allTickets[oldDeptId].findIndex(t => t.id === ticketId);
+        if (idx > -1) ticket = allTickets[oldDeptId].splice(idx, 1)[0];
+      }
+      if (!ticket) {
+        for (const d in allTickets) {
+          const idx = allTickets[d].findIndex(t => t.id === ticketId);
+          if (idx > -1) { ticket = allTickets[d].splice(idx, 1)[0]; break; }
+        }
+      }
+      if (ticket) {
+        if (!allTickets[newDeptId]) allTickets[newDeptId] = [];
+        ticket.department_id = newDeptId;
+        if (oldDeptId && departments.find(x => x.id == oldDeptId)?.name === 'Требуется обработка' && ticket.status === 'Новая') {
+          ticket.status = 'Принята';
+        }
+        allTickets[newDeptId].push(ticket);
+      }
+      renderKanban();
+    } else {
+      alert('Ошибка: ' + (data.error || 'Неизвестно'));
+      loadTickets().then(renderKanban);
+    }
+  }).catch(() => {
+    alert('Ошибка сети');
+    loadTickets().then(renderKanban);
+  });
+}
+
+function loadTickets() {
+  return fetch('/api/kanban/tickets')
+    .then(r => r.json())
+    .then(data => { allTickets = data; return data; })
+    .catch(err => {
+      console.error('Ошибка загрузки:', err);
+      alert('Не удалось загрузить данные');
+    });
+}
+
+function updateTriggerLabel(type) {
+  const config = {
+    department: { trigger: document.getElementById('deptTrigger'), dropdown: document.getElementById('kanban-dept-dropdown'), empty: 'Все отделы' },
+    status: { trigger: document.getElementById('statusTrigger'), dropdown: document.getElementById('kanban-status-dropdown'), empty: 'Все статусы' }
+  }[type];
+  if (!config?.trigger || !config?.dropdown) return;
+  const checked = config.dropdown.querySelectorAll('input:checked');
+  const textEl = config.trigger.querySelector('.selected-text');
+  const countEl = config.trigger.querySelector('.selected-count');
+  const count = checked.length;
+  countEl.textContent = count;
+  if (count === 0) textEl.textContent = config.empty;
+  else if (count === 1) textEl.textContent = checked[0].closest('label').textContent.trim();
+  else textEl.textContent = `${count} выбрано`;
+}
+
+function initKanbanFilters() {
+  const triggers = [
+    { trigger: document.getElementById('deptTrigger'), dropdown: document.getElementById('kanban-dept-dropdown'), type: 'department' },
+    { trigger: document.getElementById('statusTrigger'), dropdown: document.getElementById('kanban-status-dropdown'), type: 'status' }
+  ];
+
+  triggers.forEach(({trigger, dropdown, type}) => {
+    if (!trigger || !dropdown) return;
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.multiselect-wrapper')) dropdown.classList.remove('open');
+    });
+    dropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (type === 'status') {
+          activeQuickFilter = 'custom';
+        }
+        updateTriggerLabel(type);
+        syncQuickFilterChips();
+        renderKanban();
+      });
+    });
+    updateTriggerLabel(type);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadTickets().then(() => {
+    initKanbanFilters();
+    includeCompleted = false;
+    setQuickFilter('active');
+  });
+
+  document.getElementById('refreshBtn')?.addEventListener('click', () => loadTickets().then(renderKanban));
+  document.getElementById('slaFilter')?.addEventListener('change', () => {
+    activeQuickFilter = 'custom';
+    syncQuickFilterChips();
+    renderKanban();
+  });
+  document.querySelectorAll('.kanban-chip').forEach(btn => {
+    btn.addEventListener('click', () => setQuickFilter(btn.dataset.quick));
+  });
+
+  const filterToggle = document.getElementById('filterToggle');
+  const filterPanel = document.getElementById('filterPanel');
+  if (filterToggle && filterPanel) {
+    const setPanelOpen = (open, animate = true) => {
+      filterToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      filterPanel.setAttribute('aria-hidden', open ? 'false' : 'true');
+      if (open) {
+        filterPanel.classList.add('is-open');
+        if (animate) {
+          filterPanel.style.maxHeight = '0px';
+          requestAnimationFrame(() => filterPanel.style.maxHeight = filterPanel.scrollHeight + 'px');
+        } else {
+          filterPanel.style.maxHeight = 'none';
+        }
+      } else {
+        if (animate) {
+          filterPanel.style.maxHeight = filterPanel.scrollHeight + 'px';
+          requestAnimationFrame(() => filterPanel.style.maxHeight = '0px');
+        } else {
+          filterPanel.style.maxHeight = '0px';
+        }
+        filterPanel.classList.remove('is-open');
+      }
+      const onEnd = () => {
+        filterPanel.removeEventListener('transitionend', onEnd);
+        if (filterToggle.getAttribute('aria-expanded') === 'true') filterPanel.style.maxHeight = 'none';
+      };
+      if (open && animate) filterPanel.addEventListener('transitionend', onEnd);
+    };
+    setPanelOpen(false, false);
+    filterToggle.addEventListener('click', () => {
+      const open = filterToggle.getAttribute('aria-expanded') === 'true';
+      setPanelOpen(!open, true);
+    });
+    window.addEventListener('resize', () => {
+      const open = filterToggle.getAttribute('aria-expanded') === 'true';
+      if (open) filterPanel.style.maxHeight = filterPanel.scrollHeight + 'px';
+    });
+  }
+
+  document.getElementById('clearKanbanFilters')?.addEventListener('click', () => {
+    document.querySelectorAll('#kanban-dept-dropdown input[type="checkbox"], #kanban-status-dropdown input[type="checkbox"]').forEach(cb => cb.checked = false);
+    const sla = document.getElementById('slaFilter');
+    if (sla) sla.value = '';
+    updateTriggerLabel('department');
+    updateTriggerLabel('status');
+    includeCompleted = false;
+    setQuickFilter('active');
+  });
+});
+</script>
+{% endblock %}

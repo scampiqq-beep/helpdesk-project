@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Журнал аудита{% endblock %}
+
+{% block content %}
+{% include "partials/admin_sidebar.html" %}
+<div class="admin-page-head">
+  <div>
+    <h1 class="admin-page-title">Журнал аудита</h1>
+    <p class="admin-page-subtitle">Раздел для просмотра служебных событий системы: кто и когда менял данные, запускал действия и работал с объектами helpdesk.</p>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-body">
+    <div class="muted" style="margin-bottom:14px;line-height:1.6;">
+      Здесь можно отфильтровать события по действию, пользователю и типу объекта. Журнал нужен для контроля изменений, разбора инцидентов и проверки административных операций.
+    </div>
+    <form method="GET" class="d-flex" style="gap:10px; flex-wrap:wrap; align-items:end;">
+      <div>
+        <label class="form-label">Действие</label>
+        <input class="form-control" type="text" name="action" value="{{ action }}" placeholder="Например: user.update или ticket.comment">
+      </div>
+      <div>
+        <label class="form-label">ID пользователя</label>
+        <input class="form-control" type="number" name="actor" value="{{ actor or '' }}" min="1">
+      </div>
+      <div>
+        <label class="form-label">Тип объекта</label>
+        <select class="form-select" name="target_type">
+          <option value="" {% if not target_type %}selected{% endif %}>Все типы</option>
+          <option value="user" {% if target_type=='user' %}selected{% endif %}>Пользователь</option>
+          <option value="ticket" {% if target_type=='ticket' %}selected{% endif %}>Заявка</option>
+          <option value="system" {% if target_type=='system' %}selected{% endif %}>Система</option>
+        </select>
+      </div>
+      <div>
+        <button class="btn btn-primary" type="submit">Применить</button>
+        <a class="btn btn-secondary" href="{{ url_for('admin_audit') }}">Сбросить</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body" style="overflow:auto;">
+    <table class="table" style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Дата и время</th>
+          <th style="text-align:left;">Пользователь</th>
+          <th style="text-align:left;">Действие</th>
+          <th style="text-align:left;">Объект</th>
+          <th style="text-align:left;">IP-адрес</th>
+          <th style="text-align:left;">Подробности</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in logs %}
+          <tr>
+            <td class="small">{{ l.created_at.strftime('%d.%m.%Y %H:%M:%S') if l.created_at else '' }}</td>
+            <td class="small">
+              {% if l.actor %}
+                #{{ l.actor.id }} — {{ l.actor.username or l.actor.email }}
+              {% elif l.actor_user_id %}
+                #{{ l.actor_user_id }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td><code>{{ l.action }}</code></td>
+            <td class="small">
+              {% if l.target_type and l.target_id %}
+                {{ l.target_type }} #{{ l.target_id }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td class="small">{{ l.ip or '' }}</td>
+            <td class="small"><pre style="margin:0; white-space:pre-wrap;">{{ l.details_json or '' }}</pre></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if not logs %}
+      <div class="muted">Записи по выбранным фильтрам не найдены.</div>
+    {% endif %}
+  </div>
+</div>
+</section>
+</div>
+{% endblock %}

@@ -1,0 +1,7 @@
+Register blueprint manually in your app factory if needed:
+
+from helpdesk_app.routes.admin_automation import admin_automation_bp
+app.register_blueprint(admin_automation_bp)
+
+This file is included as a reminder because the exact project route bootstrap
+can differ between your current patched steps.

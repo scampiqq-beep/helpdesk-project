@@ -1,0 +1,7 @@
+Если ваш bootstrap не подхватывает route-модуль автоматически, зарегистрируйте blueprint вручную:
+
+from helpdesk_app.routes.admin_automation_preview import admin_automation_preview_bp
+app.register_blueprint(admin_automation_preview_bp)
+
+URL:
+- /admin/automation/preview/<ticket_id>

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-container">
+  <div class="page-toolbar" style="margin-bottom:16px;">
+    <div class="page-title"><span>Регистрация оператора</span></div>
+  </div>
+<h2>Регистрация оператора техподдержки</h2>
+<form method="POST">
+    <p><label>Логин:</label><input type="text" name="username" required></p>
+    <p><label>Пароль:</label><input type="password" name="password" required></p>
+    <p><label>Роль:</label>
+        <select name="role" class="form-control" required>
+  {% for value, label in USER_ROLES.items() %}
+    {% if value != 'admin' %}
+      <option value="{{ value }}">{{ label }}</option>
+    {% endif %}
+  {% endfor %}
+</select>
+    </p>
+    <p><button type="submit">Зарегистрировать</button> <a href="{{ url_for('admin') }}">← Назад</a></p>
+</form>
+</div>
+{% endblock %}

@@ -1,0 +1,1975 @@
+/* hd.css — кастомный дизайн HelpDesk (без Bootstrap).
+   Идея: сохранить текущую «пастельную» эстетику, но иметь один источник правды по стилям.
+   Файл включает базовые компоненты (layout, кнопки, формы, карточки, таблицы, модалки) + бейджи статусов/приоритетов.
+*/
+
+:root{
+  /* Layout */
+  --page-max:1840px;
+  --radius:16px;
+  --radius-sm:12px;
+
+  /* Light / cold */
+  /* a bit darker to better separate panels */
+  --bg:#e8eff8;
+  --surface:#ffffff;
+  --surface-2:#eaf2ff;
+  --text:#0f172a;
+  --muted:rgba(15,23,42,.65);
+  --border:rgba(15,23,42,.14);
+  --border-2:rgba(15,23,42,.22);
+  --shadow:0 16px 46px rgba(15,23,42,.12);
+  --shadow-sm:0 10px 26px rgba(15,23,42,.10);
+
+  --primary:#2563eb;
+  --primary-2:#1d4ed8;
+  --danger:#ef4444;
+  --success:#15803d;
+  --warning:#f59e0b;
+  --info:#0ea5e9;
+
+  --focus:0 0 0 3px rgba(37,99,235,.22);
+}
+
+/* Dark / cold */
+html[data-theme="dark"]{
+  --bg:#0b1220;
+  --surface:#0f172a;
+  --surface-2:#111c33;
+  --text:#e5e7eb;
+  --muted:rgba(229,231,235,.70);
+  --border:rgba(229,231,235,.12);
+  --border-2:rgba(229,231,235,.18);
+  --shadow:0 18px 50px rgba(0,0,0,.45);
+  --shadow-sm:0 12px 34px rgba(0,0,0,.36);
+
+  --primary:#60a5fa;
+  --primary-2:#3b82f6;
+  --danger:#fb7185;
+  --success:#16a34a;
+  --warning:#fbbf24;
+  --info:#38bdf8;
+
+  --focus:0 0 0 3px rgba(96,165,250,.20);
+}
+
+/* Page toolbar (заголовок + действия) */
+.page-toolbar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:0 0 1rem 0;padding:.65rem .9rem;border:1px solid var(--border);border-radius:16px;background:color-mix(in oklab, var(--surface) 86%, var(--bg));box-shadow:0 10px 30px rgba(17,24,39,.04)}
+.page-title{display:flex;align-items:center;gap:.6rem;font-weight:750}
+.page-title i{font-size:1.1rem;color:var(--primary)}
+.page-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+
+/* Ticket list actions (Создать + Фильтр) */
+.ticketlist-actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:0 0 1rem 0}
+.ticketlist-actions .btn{max-width:100%}
+@media (max-width: 520px){
+  .ticketlist-actions .btn{width:100%;justify-content:center}
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",Arial,sans-serif;
+  color:var(--text);
+  background:var(--bg);
+  line-height:1.45;
+}
+/* Prevent accidental horizontal scrollbars on wide screens (shadows/1px overflows) */
+@media (min-width: 1200px){
+  html, body{overflow-x:hidden;}
+}
+img{max-width:100%;height:auto}
+a{color:var(--primary);text-decoration:none}a:hover{text-decoration:underline}
+
+html[data-theme="dark"] a{color:var(--primary)}
+
+/* ---------------- Layout ---------------- */
+.container,.container-fluid{width:100%;margin-inline:auto;padding-inline:1rem}
+@media (min-width: 1200px){.container{max-width:var(--page-max)}}
+
+/*
+  Единый контейнер страниц.
+  Выровнен по ширине/отступам с верхним меню (topbar-surface).
+*/
+.main-content{padding:10px 12px;min-height:calc(100vh - 112px)}
+/*
+  Важно: ширина «поверхностей» (topbar/card/table) должна совпадать.
+  Поэтому page-container НЕ добавляет собственный горизонтальный padding,
+  а отступы задаются на уровне main-content (и top-navbar).
+*/
+.page-container{width:100%;max-width:var(--page-max);margin-inline:auto;padding-inline:0}
+
+/* Убираем двойные паддинги/ограничения у старых bootstrap-контейнеров внутри page-container */
+.page-container .container,
+.page-container .container-fluid{
+  max-width:100%;
+  padding-inline:0;
+  margin-inline:0;
+}
+
+.footer{
+  background:rgba(255,255,255,.65);
+  backdrop-filter:saturate(1.2) blur(8px);
+  border-top:1px solid var(--border);
+  color:var(--muted);
+  padding:.85rem 1rem;
+  font-size:.85rem;
+}
+
+.footer-inner{
+  width:100%;
+  max-width:var(--page-max);
+  margin-inline:auto;
+  padding-inline:1rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.footer-clock{white-space:nowrap;opacity:.9}
+
+html[data-theme="dark"] .footer{background:rgba(15,23,42,.65)}
+
+/* Top navbar (без bootstrap) — используем существующую разметку */
+.top-navbar{
+  /* Фон на всю ширину экрана, а сама панель — как "блок" (card) */
+  background:transparent;
+  padding:10px 12px;
+}
+
+/* Поверхность топ-меню в стиле блоков */
+.topbar-surface{
+  background:rgba(255,255,255,.78);
+  backdrop-filter:saturate(1.2) blur(10px);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:0 10px 28px rgba(0,0,0,.06);
+  /* Весь блок (фон/рамка) — фиксированной ширины, как таблица в ticket_list */
+  width:100%;
+  max-width:var(--page-max);
+  margin-inline:auto;
+  /* padding убираем, чтобы внешний контур совпадал по ширине с контентом */
+  padding-inline:0;
+}
+
+html[data-theme="dark"] .topbar-surface{
+  background:rgba(15,23,42,.78);
+  box-shadow:0 14px 40px rgba(0,0,0,.35);
+}
+
+/* Новая раскладка топбара */
+.topbar-inner{display:flex;align-items:center;justify-content:space-between;height:64px;padding:0 12px;gap:12px}
+.topbar-left{display:flex;align-items:center;gap:14px;min-width:0}
+.topbar-menu{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;margin-left:auto}
+
+.topbar-burger{display:none}
+
+/* User dropdown */
+.topbar-user{position:relative}
+.user-btn{background:transparent;border:none;cursor:pointer}
+.user-btn .caret{opacity:.7;margin-left:2px}
+.user-dd{position:absolute;right:0;top:44px;min-width:180px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:0 16px 44px rgba(0,0,0,.14);
+  padding:6px;
+  z-index:5000;
+}
+.user-dd-item{display:flex;align-items:center;gap:.5rem;padding:.55rem .7rem;border-radius:10px;color:var(--text);text-decoration:none}
+.user-dd-item:hover{background:var(--surface-2);color:var(--primary)}
+
+
+.navbar-brand-wrapper{display:flex;align-items:center;gap:12px;padding:0 12px;text-decoration:none !important}
+.navbar-logo{
+  width:40px;height:40px;border:2px solid var(--border);
+  border-radius:10px;padding:4px;background:rgba(255,255,255,.92);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.05);
+  transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.navbar-logo:hover{transform:scale(1.03);box-shadow:0 6px 14px rgba(102,126,234,.18);border-color:#cfd7ff}
+.navbar-logo img{width:100%;height:100%;object-fit:contain}
+.navbar-title{color:var(--text);font-weight:600}
+.navbar-title:hover{color:var(--primary);text-decoration:none}
+.navbar-subtitle{font-size:.75rem;color:var(--muted);display:block;margin-top:-2px}
+
+.top-navbar .navbar-nav{display:flex;gap:.25rem;align-items:center;margin:0;padding:0;list-style:none}
+.top-navbar .nav-link{
+  display:inline-flex;align-items:center;gap:.45rem;
+  color:var(--muted);font-weight:600;font-size:.9rem;
+  padding:.5rem .75rem;border-radius:10px;
+  transition:background .15s ease, color .15s ease;
+}
+
+/* Small icon button (topbar / actions) */
+.icon-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--muted);
+  box-shadow:0 6px 18px rgba(15,23,42,.06);
+  cursor:pointer;
+  transition:transform .12s ease, background .12s ease, color .12s ease;
+}
+.icon-btn:hover{transform:translateY(-1px);background:var(--surface-2);color:var(--text)}
+.icon-btn:active{transform:translateY(0)}
+.icon-btn:focus{outline:none;box-shadow:var(--focus)}
+
+/* Theme button: show relevant icon */
+.theme-ico{display:none;}
+html[data-theme="dark"] .theme-ico-sun{display:inline-flex;}
+html[data-theme="dark"] .theme-ico-moon{display:none;}
+html:not([data-theme="dark"]) .theme-ico-moon{display:inline-flex;}
+html:not([data-theme="dark"]) .theme-ico-sun{display:none;}
+
+/* ---------- Ticket sidebar: shared departments (plain text, safe for long names) ---------- */
+.shared-depts{display:flex;flex-direction:column;gap:6px;max-width:100%}
+.shared-dept-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.02);max-width:100%}
+.shared-dept-name{flex:1;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shared-dept-remove{flex:0 0 auto;border:none;background:transparent;padding:0 6px;line-height:1;font-size:18px;color:rgba(0,0,0,.55);cursor:pointer}
+.shared-dept-remove:hover{color:rgba(0,0,0,.85)}
+.top-navbar .nav-link:hover{background:var(--surface-2);color:var(--primary)}
+.top-navbar .nav-link.active{background:var(--surface-2);color:var(--primary);font-weight:600}
+
+/* Email подтверждён */
+.email-verified{
+  display:inline-flex;align-items:center;
+  margin-left:.5rem;
+  font-size:.82rem;
+  color:#198754;
+  background:rgba(25,135,84,.08);
+  border:1px solid rgba(25,135,84,.2);
+  padding:.15rem .45rem;
+  border-radius:999px;
+}
+
+/* Адаптация под маленькие экраны */
+@media (max-width: 1100px){
+  .topbar-inner{height:auto;flex-wrap:wrap;padding:10px 12px}
+  /* меню всегда видно, без бургера */
+  .topbar-menu{flex-wrap:wrap}
+  .topbar-right{flex-wrap:wrap}
+  .navbar-brand-wrapper{padding:0 6px}
+}
+
+@media (max-width: 640px){
+  .navbar-subtitle{display:none}
+  .top-navbar{padding:8px 10px}
+  .topbar-inner{gap:10px}
+}
+
+/* Локальные SVG-иконки */
+.ico{width:18px;height:18px;display:inline-block;vertical-align:-3px;fill:currentColor}
+.ico-fire{color:#f59e0b}
+.ico-sla{color:var(--danger)}
+
+/* === Auth (login/register) === */
+.auth-wrap{max-width:560px;margin:22px auto 40px;}
+.auth-card{border-radius:16px;overflow:hidden;}
+.auth-head{display:flex;flex-direction:column;gap:6px;}
+.auth-title{font-size:1.15rem;font-weight:800;letter-spacing:.2px;}
+.auth-subtitle{font-size:.9rem;color:var(--muted);}
+.auth-form .field{margin-bottom:14px;}
+.auth-form label{display:block;font-weight:600;margin-bottom:6px;}
+.input-wrap{position:relative;}
+.input-wrap .icon-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);}
+.auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+.auth-grid .auth-grid-span{grid-column:1 / -1;}
+@media (max-width: 720px){
+  .auth-wrap{max-width:520px;padding:0 12px;}
+  .auth-grid{grid-template-columns:1fr;}
+}
+
+/* Скрываем старые теги иконок, чтобы не было «квадратиков» без шрифтов */
+.bi, .fa, .fas, .far{display:none !important}
+
+/* ---------------- Utilities ---------------- */
+.bg-light{background:var(--bg) !important}
+.text-dark{color:var(--text) !important}
+.text-muted{color:var(--muted) !important}
+
+.d-flex{display:flex !important}
+.align-items-center{align-items:center !important}
+.justify-content-between{justify-content:space-between !important}
+.justify-content-end{justify-content:flex-end !important}
+.gap-1{gap:.25rem !important}
+.gap-2{gap:.5rem !important}
+.gap-3{gap:1rem !important}
+
+.w-100{width:100% !important}
+
+.mt-1{margin-top:.25rem !important}.mt-2{margin-top:.5rem !important}.mt-3{margin-top:1rem !important}.mt-4{margin-top:1.5rem !important}
+.mb-1{margin-bottom:.25rem !important}.mb-2{margin-bottom:.5rem !important}.mb-3{margin-bottom:1rem !important}.mb-4{margin-bottom:1.5rem !important}
+.me-1{margin-right:.25rem !important}.me-2{margin-right:.5rem !important}
+.ms-1{margin-left:.25rem !important}.ms-2{margin-left:.5rem !important}
+
+.p-1{padding:.25rem !important}.p-2{padding:.5rem !important}.p-3{padding:1rem !important}.p-4{padding:1.5rem !important}
+.py-1{padding-block:.25rem !important}.py-2{padding-block:.5rem !important}.py-3{padding-block:1rem !important}
+.px-2{padding-inline:.5rem !important}.px-3{padding-inline:1rem !important}
+
+.small{font-size:.875rem}
+
+.position-fixed{position:fixed !important}
+.top-0{top:0 !important}
+.end-0{right:0 !important}
+.p-3{padding:1rem !important}
+
+/* ---------------- Grid (упрощённо) ---------------- */
+.row{display:flex;flex-wrap:wrap;margin-inline:-.5rem}
+.row > *{padding-inline:.5rem}
+.col{flex:1 0 0%}
+.col-12{flex:0 0 100%;max-width:100%}
+@media (min-width: 768px){
+  .col-md-6{flex:0 0 50%;max-width:50%}
+  .col-md-4{flex:0 0 33.3333%;max-width:33.3333%}
+  .col-md-3{flex:0 0 25%;max-width:25%}
+  .col-md-8{flex:0 0 66.6667%;max-width:66.6667%}
+  .col-md-9{flex:0 0 75%;max-width:75%}
+}
+
+/* ---------------- Cards / Panels ---------------- */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);
+  overflow:hidden;
+}
+.card-body{padding:1rem}
+.card-header{
+  padding:.85rem 1rem;
+  background:linear-gradient(180deg, color-mix(in oklab, var(--primary) 10%, var(--surface)), rgba(255,255,255,0));
+  border-bottom:1px solid var(--border);
+  font-weight:600;
+}
+.card-title{margin:0 0 .35rem 0;font-weight:650}
+
+/* Визуальный акцент слева (если в шаблоне используется) */
+.border-start{border-left:4px solid var(--primary) !important}
+.border-start-success{border-left:4px solid var(--success) !important}
+.border-start-danger{border-left:4px solid var(--danger) !important}
+.border-start-warning{border-left:4px solid var(--warning) !important}
+.border-start-info{border-left:4px solid var(--info) !important}
+
+.border-4{border-width:4px !important}
+
+/* ---------------- Buttons ---------------- */
+.btn{
+  appearance:none;border:1px solid transparent;
+  border-radius:12px;
+  padding:.55rem .85rem;
+  font-weight:500;
+  font-size:.92rem;
+  line-height:1;
+  min-height:36px;
+  display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
+  cursor:pointer;
+  transition:transform .02s ease, background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.btn:active{transform:translateY(1px)}
+.btn:focus{outline:none;box-shadow:var(--focus)}
+
+/*
+  Единый стиль кнопок (как «Отправить»):
+  по умолчанию — спокойные outline/soft-кнопки на поверхности.
+*/
+.btn-primary{background:var(--surface);border-color:rgba(37,99,235,.35);color:var(--primary)}
+.btn-primary:hover{background:rgba(37,99,235,.10)}
+
+
+.btn-outline-primary{background:transparent;border-color:rgba(37,99,235,.35);color:var(--primary)}
+.btn-outline-primary:hover{background:rgba(37,99,235,.10)}
+
+/* Action buttons (как «Ответить»): спокойные outline-кнопки для большинства действий.
+   НЕ используем для «контрольных» кнопок (Отправить/Сохранить). */
+.btn-action{background:var(--surface);border-color:var(--border-2);color:var(--text)}
+.btn-action:hover{background:var(--surface-2)}
+.btn-action:focus{outline:none;box-shadow:var(--focus)}
+
+.btn-action-primary{background:var(--surface);border-color:rgba(37,99,235,.35);color:var(--primary)}
+.btn-action-primary:hover{background:rgba(37,99,235,.10)}
+html[data-theme="dark"] .btn-action-primary{border-color:rgba(96,165,250,.35)}
+
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border-2)}
+.btn-secondary:hover{background:var(--surface-2)}
+
+.btn-danger{background:var(--surface);border-color:color-mix(in oklab, var(--danger) 28%, var(--border-2));color:var(--danger)}
+.btn-danger:hover{background:color-mix(in oklab, var(--danger) 10%, var(--surface))}
+
+.btn-success{background:var(--surface);border-color:color-mix(in oklab, var(--success) 28%, var(--border-2));color:var(--success)}
+.btn-success:hover{background:color-mix(in oklab, var(--success) 10%, var(--surface))}
+
+.btn-sm{padding:.35rem .55rem;border-radius:10px;font-size:.82rem;min-height:30px}
+.btn-xs{padding:.25rem .45rem;border-radius:10px;font-size:.78rem;min-height:26px}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn-ghost:hover{background:rgba(15,23,42,.06);color:var(--text)}
+
+html[data-theme="dark"] .btn-ghost:hover{background:rgba(229,231,235,.08)}
+
+.btn-ghost-danger{background:transparent;border-color:transparent;color:color-mix(in oklab, var(--danger) 80%, var(--text) 20%)}
+.btn-ghost-danger:hover{background:color-mix(in oklab, var(--danger) 12%, transparent);color:var(--danger)}
+
+/* Открепить (пин) — по размеру как action-кнопки, но с лёгким danger-акцентом */
+.unpin-btn{color:color-mix(in oklab, var(--danger) 80%, var(--text) 20%)}
+.unpin-btn:hover{background:color-mix(in oklab, var(--danger) 10%, var(--surface)); border-color:color-mix(in oklab, var(--danger) 22%, var(--border-2))}
+
+/* ---------------- Forms ---------------- */
+.form-label{display:block;margin:0 0 .35rem 0;color:var(--muted);font-weight:600;font-size:.9rem}
+.form-text{color:var(--muted);font-size:.85rem}
+
+.form-control,.form-select,textarea{
+  width:100%;
+  background:var(--surface);
+  border:1px solid var(--border-2);
+  border-radius:12px;
+  padding:.6rem .75rem;
+  font-size:0.95rem;
+  color:var(--text);
+  outline:none;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+
+/* Segmented control (radio) */
+.segmented{display:flex;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:6px;}
+.segmented-item{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;user-select:none;border-radius:12px;padding:10px 12px;color:var(--muted);font-weight:600;position:relative;}
+.segmented-item input{position:absolute;opacity:0;pointer-events:none;}
+.segmented-item span{display:block;width:100%;text-align:center;border-radius:12px;padding:10px 12px;}
+.segmented-item input:checked + span{background:var(--surface);border:1px solid var(--border);color:var(--text);box-shadow:0 8px 22px rgba(15,23,42,.08)}
+html[data-theme="dark"] .segmented-item input:checked + span{box-shadow:0 12px 28px rgba(0,0,0,.35)}
+.form-control:focus,.form-select:focus,textarea:focus{border-color:rgba(102,126,234,.65);box-shadow:var(--focus)}
+.form-control-sm,.form-select-sm{padding:.45rem .6rem;border-radius:10px;font-size:.9rem}
+
+.input-group{display:flex;gap:.5rem;align-items:stretch}
+.input-group > .form-control{flex:1}
+
+/* Checkbox / radio */
+.form-check{display:flex;align-items:center;gap:.5rem}
+.form-check-input{width:18px;height:18px}
+
+/* ---------------- Tables ---------------- */
+.table{width:100%;border-collapse:separate;border-spacing:0}
+.table th,.table td{padding:.75rem .75rem;border-bottom:1px solid var(--border);vertical-align:top}
+.table thead th{font-size:.85rem;color:#374151;text-transform:uppercase;letter-spacing:.03em;background:#f3f4f6}
+.table-hover tbody tr:hover{background:#fafbff}
+.table-striped tbody tr:nth-child(odd){background:#fafafa}
+
+/* ---------------- Badges / Alerts ---------------- */
+.badge{
+  display:inline-flex;align-items:center;gap:.35rem;
+  padding:.25rem .55rem;
+  border-radius:999px;
+  font-size:.82rem;
+  border:1px solid transparent;
+  white-space:nowrap;
+}
+.badge.bg-primary{background:rgba(102,126,234,.14);color:var(--primary);border-color:rgba(102,126,234,.22)}
+.badge.bg-success{background:rgba(22,163,74,.14);color:var(--success);border-color:rgba(22,163,74,.22)}
+.badge.bg-danger{background:rgba(220,38,38,.14);color:var(--danger);border-color:rgba(220,38,38,.22)}
+.badge.bg-warning{background:rgba(245,158,11,.18);color:#7a3e00;border-color:rgba(245,158,11,.24)}
+.badge.bg-secondary{background:rgba(107,114,128,.14);color:#374151;border-color:rgba(107,114,128,.24)}
+
+.alert{
+  border:1px solid var(--border);
+  background:var(--surface);
+  border-radius:14px;
+  padding:.85rem 1rem;
+  box-shadow:var(--shadow-sm);
+}
+.alert-success{border-color:rgba(22,163,74,.25);background:rgba(22,163,74,.06)}
+.alert-danger{border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.06)}
+.alert-warning{border-color:rgba(245,158,11,.28);background:rgba(245,158,11,.08)}
+.alert-info{border-color:rgba(14,165,233,.25);background:rgba(14,165,233,.06)}
+
+/* Toast (flash) */
+.toast{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  min-width:280px;
+}
+.toast-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem .8rem;border-bottom:1px solid var(--border);font-weight:650}
+.toast-body{padding:.7rem .8rem;color:#374151}
+
+/* ---------------- Dropdown ---------------- */
+.dropdown{position:relative}
+.dropdown-menu{
+  position:absolute;top:calc(100% + .35rem);
+  right:0;
+  min-width:220px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:var(--shadow);
+  padding:.35rem;
+  display:none;
+  z-index:50;
+}
+.dropdown-menu.show{display:block}
+.dropdown-item{
+  display:flex;align-items:center;gap:.55rem;
+  padding:.55rem .65rem;
+  border-radius:12px;
+  color:#374151;
+  font-size:.92rem;
+}
+.dropdown-item:hover{background:#eef2ff;color:var(--primary);text-decoration:none}
+
+/* ---------------- Modal ---------------- */
+.modal{position:fixed;inset:0;display:none;z-index:1000;padding:1rem}
+.modal.show{display:flex;align-items:center;justify-content:center}
+.modal-dialog{width:100%;max-width:720px}
+.modal-content{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1rem;border-bottom:1px solid var(--border)}
+.modal-title{margin:0;font-weight:700}
+.modal-body{padding:1rem 1rem}
+.modal-footer{padding:1rem 1rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.5rem}
+.modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.45);z-index:999}
+.btn-close{border:none;background:transparent;font-size:1.25rem;cursor:pointer;color:#6b7280}
+.btn-close:hover{color:#111827}
+
+/* Важная задача (кнопка в шапке заявки) */
+.important-toggle-btn{gap:.4rem}
+.important-toggle-btn .important-toggle-icon{display:none}
+.important-toggle-btn.is-active{border-color: color-mix(in oklab, var(--danger) 55%, var(--border)); color: var(--danger)}
+.important-toggle-btn.is-active:hover{background: color-mix(in oklab, var(--danger) 10%, var(--surface))}
+.important-toggle-btn.is-active .important-toggle-icon{display:inline}
+.important-toggle-btn .important-toggle-text{font-weight:600}
+
+
+/* ---------------- Ticket specific: статусы/приоритеты (из custom.css) ---------------- */
+/* === Единые пастельные статусы для всей системы === */
+
+/* ---------------- Ticket specific: статусы/приоритеты ---------------- */
+/* Статусы: выглядят как кнопки (фон = статус, текст/иконка = белые) */
+.status-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:112px;
+  padding:.34rem .65rem;
+  border-radius:999px;
+  font-size:.78rem;
+  font-weight:650;
+  letter-spacing:.2px;
+  border:1px solid var(--border);
+  background:var(--surface-2);
+  color:var(--text);
+  box-shadow:none;
+}
+.status-badge:hover{transform:none;filter:none;box-shadow:none;}
+.status-badge i{font-size:14px; opacity:.95; color:#fff}
+.status-badge .ico{fill:#fff}
+.status-badge:hover{transform: translateY(-1px); filter: brightness(.98); box-shadow: 0 10px 22px rgba(17,24,39,.10);}
+
+/* Палитра статусов (авто-матчится через status_badge_class в app.py) */
+\1background:color-mix(in oklab, var(--primary) 16%, var(--surface)); color:var(--primary); border-color:color-mix(in oklab, var(--primary) 28%, var(--border));}
+\1background:color-mix(in oklab, var(--warning) 18%, var(--surface)); color:color-mix(in oklab, var(--warning) 75%, var(--text)); border-color:color-mix(in oklab, var(--warning) 30%, var(--border));}   /* янтарный */
+\1background:color-mix(in oklab, var(--info) 16%, var(--surface)); color:color-mix(in oklab, var(--info) 78%, var(--text)); border-color:color-mix(in oklab, var(--info) 28%, var(--border));}     /* синий */
+\1background:color-mix(in oklab, #8b5cf6 16%, var(--surface)); color:color-mix(in oklab, #8b5cf6 78%, var(--text)); border-color:color-mix(in oklab, #8b5cf6 26%, var(--border));}/* фиолетовый */
+\1background:color-mix(in oklab, var(--success) 18%, var(--surface)); color:color-mix(in oklab, var(--success) 78%, var(--text)); border-color:color-mix(in oklab, var(--success) 28%, var(--border));}   /* зелёный (темнее/спокойнее) */
+\1background:color-mix(in oklab, var(--danger) 14%, var(--surface)); color:var(--danger); border-color:color-mix(in oklab, var(--danger) 26%, var(--border));}      /* красный */
+.status-badge.status-duplicate{background: rgba(245,158,11,.92);} /* янтарный */
+.status-badge.status-mistake{background: rgba(107,114,128,.92);}  /* серый */
+.status-badge.status-withdrawn{background: rgba(148,163,184,.92);} /* slate */
+
+.status-badge.status-default{background: rgba(107,114,128,.92);}   /* серый */
+
+/* На очень узких экранах уменьшаем ширину, чтобы ничего не "вылазило" */
+@media (max-width: 480px){
+  .status-badge{min-width: 104px; padding:7px 10px; font-size:12px}
+}
+
+/* "Чипы" для небольших меток (например отделы в профиле) */
+.chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background: rgba(102,126,234,.08);
+  color: var(--text);
+  font-weight:600;
+  font-size:12px;
+  white-space:nowrap;
+}
+
+/* Small icon button (tables / quick actions) */
+.icon-btn-sm{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--muted);
+  box-shadow:0 6px 16px rgba(15,23,42,.06);
+  cursor:pointer;
+  transition:transform .12s ease, background .12s ease, color .12s ease;
+}
+.icon-btn-sm:hover{transform:translateY(-1px);background:var(--surface-2);color:var(--text)}
+.icon-btn-sm:active{transform:translateY(0)}
+.icon-btn-sm .ico{width:16px;height:16px}
+
+/* Unified modal surface */
+.modal-content.hd-modal{
+  border-radius:18px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  box-shadow:var(--shadow);
+}
+.modal-content.hd-modal .modal-header{
+  background:color-mix(in oklab, var(--surface) 85%, var(--bg));
+}
+
+/* Lightweight modal (без Bootstrap JS)
+   Важно: НЕ используем класс .hd-modal, т.к. он применяется к .modal-content (Bootstrap)
+   и из-за конфликта модалки становились полноэкранными. */
+.hd-modal-shell{position:fixed; inset:0; z-index:9999;}
+.hd-modal-shell[hidden]{display:none;}
+.hd-modal__backdrop{position:absolute; inset:0; background:rgba(0,0,0,.45);}
+.hd-modal__panel{
+  position:relative;
+  width:min(980px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow:auto;
+  margin:12px auto;
+  border-radius:18px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  box-shadow: var(--shadow);
+}
+.hd-modal__header{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border);}
+.hd-modal__title{font-weight:800; color:var(--text);}
+.hd-modal__close{width:34px; height:34px; border-radius:10px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); cursor:pointer;}
+.hd-modal__body{padding:14px;}
+
+/* ---------------- Profile ---------------- */
+.profile-head{display:flex;align-items:center;gap:14px}
+.profile-avatar{
+  width:52px;height:52px;border-radius:999px;
+  background: linear-gradient(135deg, rgba(102,126,234,.35), rgba(118,75,162,.25));
+  border:1px solid rgba(102,126,234,.25);
+  box-shadow: inset 0 0 0 6px rgba(255,255,255,.55);
+}
+.profile-head-main{min-width:0}
+.profile-name{font-weight:750;font-size:1.1rem;line-height:1.2}
+.profile-sub{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+
+.profile-grid{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:12px 16px;
+}
+
+/* ---------------- MultiSelect (TicketList filters) ---------------- */
+.ms{position:relative;}
+.ms-trigger{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--surface);
+  color:var(--text);
+  font-weight:600;
+  font-size:14px;
+  cursor:pointer;
+}
+.ms-trigger:after{content:'▾'; font-size:12px; color:var(--muted); margin-left:auto;}
+.ms.has-value .ms-trigger{border-color: rgba(102,126,234,.45); box-shadow: 0 0 0 3px rgba(102,126,234,.12);}
+
+.ms-menu{
+  position:absolute;
+  left:0; right:0;
+  top:calc(100% + 6px);
+  z-index:50;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  box-shadow: var(--shadow-sm);
+  padding:8px;
+  max-height: 260px;
+  overflow:auto;
+  display:none;
+}
+.ms.open .ms-menu{display:block;}
+
+.ms-opt{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  user-select:none;
+}
+.ms-opt:hover{background: rgba(102,126,234,.08);}
+.ms-opt input{width:16px;height:16px;}
+.ms-opt span{font-size:14px; color:var(--text);}
+@media (min-width: 768px){
+  .profile-grid{grid-template-columns: 1fr 1fr}
+}
+.profile-field{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:color-mix(in oklab, var(--surface) 88%, var(--bg))}
+.profile-label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.profile-value{font-weight:600;color:var(--text);word-break:break-word}
+.profile-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+
+.priority-badge {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  font-size: 0.875em;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.priority-badge.priority-low,
+.priority-badge.priority-Низкий {
+  background-color: #e9ecef;
+  color: #495057;
+  border-color: #dee2e6;
+}
+
+.priority-badge.priority-medium,
+.priority-badge.priority-Средний {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  border-color: #bee5eb;
+}
+
+.priority-badge.priority-high,
+.priority-badge.priority-Высокий {
+  background-color: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb;
+}
+
+/* Немного «премиальности» для карточек на страницах */
+.card + .card{margin-top:1rem}
+
+/* Fancybox (если используется) — пусть не ломает фон */
+.fancybox__container{z-index:2000}
+
+/* =============================
+   Ticket list (tickets)
+   ============================= */
+
+.priority-legend{
+  display:flex; gap:12px; flex-wrap:wrap;
+  margin: 12px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: .85rem;
+}
+.priority-legend-item{display:flex; align-items:center; gap:8px;}
+.priority-legend-indicator{width:12px; height:12px; border-radius:4px;}
+.priority-legend-high{background:#dc3545;}
+.priority-legend-medium{background:#ffc107;}
+.priority-legend-low{background:#28a745;}
+
+.tickets-table{
+  width:100%;
+  border-collapse: collapse;
+  font-size: .86rem;
+}
+.tickets-table th,
+.tickets-table td{
+  padding: 10px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  position: relative;
+}
+.tickets-table th{
+  font-weight: 600;
+  background: color-mix(in oklab, var(--surface) 70%, #fff 30%);
+}
+.tickets-table tbody tr:hover{background: color-mix(in oklab, var(--primary) 4%, #fff 96%);}
+
+.tickets-table tbody tr.critical:hover{background:rgba(220,53,69,.12);}
+
+/* Приоритеты убраны: используем только отметку "Критично" */
+.tickets-table tbody tr.critical{background:rgba(220,53,69,.08);}
+
+.tickets-table .col-id{width:64px; text-align:center;}
+.tickets-table .col-dates{width:160px; text-align:center;}
+.tickets-table .col-status{width:130px; text-align:center; white-space: normal; word-break: break-word;}
+.tickets-table .col-org{width:180px; text-align:left;}
+.tickets-table .col-inn{width:130px; text-align:left;}
+.tickets-table .col-subject{text-align:left;}
+
+.tickets-table .col-subject a{color: var(--primary); text-decoration:none;}
+.tickets-table .col-subject a:hover{text-decoration: underline;}
+
+.status-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: .75rem;
+  line-height: 1.2;
+  border: 1px solid color-mix(in oklab, currentColor 15%, transparent);
+}
+
+/* overdue row */
+/* overdue row */
+.tickets-table tbody tr.overdue td{background:color-mix(in oklab, var(--danger) 8%, var(--surface));}
+.tickets-table tbody tr.overdue:hover td{background:color-mix(in oklab, var(--danger) 12%, var(--surface));}
+
+/* important row */
+.tickets-table tbody tr.row-important td{background:color-mix(in oklab, #f59e0b 10%, var(--surface));}
+.tickets-table tbody tr.row-important:hover td{background:color-mix(in oklab, #f59e0b 14%, var(--surface));}
+
+
+@media (max-width: 992px){
+  .tickets-table{table-layout:auto;}
+  .tickets-table .col-org, .tickets-table .col-inn{max-width: 140px;}
+}
+@media (max-width: 768px){
+  .tickets-table .col-org, .tickets-table .col-inn{display:none;}
+  .tickets-table .col-id{width:56px;}
+  .tickets-table .col-dates{width:140px;}
+  .tickets-table .col-status{width:110px;}
+}
+
+
+/* Ticket list actions + filters */
+.ticketlist-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin: 10px 0 14px;
+  flex-wrap: wrap;
+}
+
+/* Form controls (project-wide) */
+.input,
+.select,
+.textarea{
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .05s ease;
+  outline: none;
+}
+.textarea{min-height: 96px; resize: vertical;}
+.select{appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 16px) calc(50% - 2px), calc(100% - 11px) calc(50% - 2px); background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; padding-right: 34px;}
+.input:hover,
+.select:hover,
+.textarea:hover{border-color: rgba(102,126,234,.55)}
+.input:focus,
+.select:focus,
+.textarea:focus{border-color: rgba(102,126,234,.85); box-shadow: 0 0 0 4px rgba(102,126,234,.12)}
+
+/* ===== Popup multiselect (departments/statuses/etc.) ===== */
+.multiselect-wrapper{position:relative; width:100%;}
+.multiselect-trigger{
+  width:100%;
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+  user-select:none;
+}
+.multiselect-trigger:hover{border-color: rgba(102,126,234,.55)}
+.multiselect-trigger:focus{outline:none; border-color: rgba(102,126,234,.85); box-shadow: 0 0 0 4px rgba(102,126,234,.12)}
+.multiselect-trigger .selected-text{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow: ellipsis; color: var(--text);}
+.multiselect-trigger .selected-count{
+  background: rgba(102,126,234,.10);
+  border: 1px solid rgba(102,126,234,.18);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: .75rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--primary) 80%, #000);
+}
+.multiselect-trigger i{opacity:.75}
+
+.multiselect-dropdown{
+  position:absolute;
+  top: calc(100% + 6px);
+  left:0;
+  right:0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 40;
+  display:none;
+  max-height: 260px;
+  overflow:auto;
+  padding: 6px;
+}
+.multiselect-dropdown.open{display:block;}
+
+.multiselect-option{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor:pointer;
+  white-space: nowrap;
+}
+.multiselect-option:hover{background: rgba(102,126,234,.08)}
+.multiselect-option input[type="checkbox"]{width:16px; height:16px; margin:0; flex: 0 0 16px;}
+.multiselect-placeholder{padding:8px 10px; color: var(--muted); font-size: .9rem;}
+
+
+
+/* ===== Ticket list: filter panel (custom collapse) ===== */
+.filter-wrapper{margin-top: 10px;margin-bottom: 14px;}
+.filter-panel{
+  background: var(--surface);
+  border:1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  /* убрали синюю вертикальную окантовку */
+  border-left: none;
+
+  overflow:hidden;
+  opacity: 0;
+  max-height: 0;
+  padding: 0 14px;
+  transition: max-height .28s ease, opacity .18s ease, padding .18s ease;
+}
+.filter-panel.is-open{
+  opacity: 1;
+  padding: 14px;
+  /* чтобы выпадающие мультиселекты/меню не обрезались */
+  overflow: visible;
+}
+.filter-form .filter-grid{
+  display:grid;
+  /* авто-адаптация, чтобы элементы/кнопки не "вылазили" на узких экранах */
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.filter-form .field{display:flex;flex-direction:column;gap:6px}
+.filter-form .field label{font-size:12px;color:var(--muted);font-weight:600}
+.filter-form .field-wide{grid-column: span 2;}
+.filter-actions{display:flex;gap:10px;margin-top: 12px;align-items:center;flex-wrap:wrap}
+
+/* Ticket list loading overlay */
+.list-loading{
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.55);
+  backdrop-filter: blur(2px);
+  z-index: 5;
+}
+.list-loading.is-on{display:flex;}
+.spinner{
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(0,0,0,.12);
+  border-top-color: rgba(102,126,234,.85);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin{to{transform: rotate(360deg)}}
+
+/* ===== Ticket list: table wrapper ===== */
+.card-table{padding:0;overflow:hidden}
+/*
+  Ticket list table wrapper:
+  - On desktop (>=992px) we avoid horizontal scrollbar by forcing fixed table layout + wrapping.
+  - On small screens we allow horizontal scroll.
+*/
+.table-wrap{overflow-x:hidden; overflow-y:visible;}
+@media (max-width: 992px){
+  .table-wrap{overflow-x:auto;}
+}
+
+/* ---------------- Bootstrap-ish helpers (для админки без bootstrap) ---------------- */
+/* Tabs */
+.nav{display:flex;flex-wrap:wrap;gap:.35rem;list-style:none;padding:0;margin:0}
+.nav-tabs{border-bottom:1px solid var(--border);padding-bottom:.35rem;margin-bottom:.75rem}
+.nav-tabs .nav-item{margin:0}
+.nav-tabs .nav-link{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.45rem .75rem;
+  border:1px solid transparent;
+  border-radius:12px;
+  color:var(--muted);
+  text-decoration:none;
+  background:transparent;
+}
+.nav-tabs .nav-link:hover{background:rgba(17,24,39,.04);text-decoration:none;color:#374151}
+.nav-tabs .nav-link.active{
+  color:var(--text);
+  background:rgba(102,126,234,.10);
+  border-color:rgba(102,126,234,.22);
+}
+
+/* Collapse / accordion */
+.collapse{display:none}
+.collapse.show{display:block}
+.accordion{border:1px solid var(--border);border-radius:16px;overflow:visible;background:var(--surface)}
+.accordion .accordion-item,
+.accordion .accordion-body,
+.accordion .accordion-collapse{overflow:visible;}
+.accordion-item{border-top:1px solid var(--border)}
+.accordion-item:first-child{border-top:none}
+.accordion-header{margin:0}
+.accordion-button{
+  width:100%;text-align:left;cursor:pointer;
+  display:flex;align-items:center;gap:.5rem;
+  padding:.65rem .85rem;
+  border:none;background:transparent;
+  font-weight:650;color:#374151;
+}
+.accordion-button:hover{background:rgba(17,24,39,.03)}
+.accordion-body{padding:.85rem;border-top:1px solid var(--border);background:var(--surface-2)}
+
+/* Small utilities used in templates */
+.me-1{margin-right:.25rem}.me-2{margin-right:.5rem}
+.mb-0{margin-bottom:0}.mb-2{margin-bottom:.5rem}.mb-3{margin-bottom:.75rem}.mb-4{margin-bottom:1rem}
+.mt-3{margin-top:.75rem}
+.p-0{padding:0}.p-2{padding:.5rem}.p-3{padding:.75rem}
+.py-1{padding-top:.25rem;padding-bottom:.25rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}
+.px-2{padding-left:.5rem;padding-right:.5rem}
+.text-muted{color:var(--muted)}
+.small{font-size:.9em}
+.rounded-1{border-radius:10px}.rounded-2{border-radius:14px}
+.border{border:1px solid var(--border)}
+.shadow-sm{box-shadow:var(--shadow-sm)}
+.bg-white{background:var(--surface)}
+.bg-light{background:var(--surface-2)}
+
+/* Table responsiveness wrapper */
+.table-responsive{overflow:auto}
+
+/*
+  Tickets table: desktop-first for 1920x1080.
+  Fixed layout prevents long words from expanding the table width.
+  Specific text columns are allowed to wrap.
+*/
+.tickets-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.tickets-table thead th{
+  position: sticky; top:0;
+  z-index: 5;
+  background: var(--surface-2);
+  text-align:left;
+  font-size:12px;
+  color: var(--muted);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.tickets-table tbody td{
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  /* allow wrapping by default on desktop */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.tickets-table tbody tr:hover{background: rgba(102,126,234,.04)}
+.tickets-table .link{color: var(--text);text-decoration:none;font-weight:600}
+.tickets-table .link:hover{text-decoration:underline}
+.tickets-table .subline{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* Fixed column widths (desktop)
+   Важно: НЕ задаём ширину для "Тема" (col-subject), чтобы она забирала остаток и не появлялись странные "пустые" промежутки.
+*/
+.tickets-table .col-id{width:92px}
+.tickets-table .col-org{width:170px}
+.tickets-table .col-inn{width:120px}
+.tickets-table .col-dates{width:138px}
+.tickets-table .col-cat{width:140px}
+.tickets-table .col-dept{width:170px}
+.tickets-table .col-status{width:120px}
+
+/* Keep numeric/date columns in one line (без троеточий) */
+.tickets-table td.col-id,
+.tickets-table td.col-inn,
+.tickets-table td.col-dates,
+.tickets-table td.col-status{white-space: nowrap;}
+
+/* ID и статус: показываем полностью, без обрезки */
+.tickets-table td.col-id,
+.tickets-table td.col-status{overflow:visible; text-overflow:clip;}
+
+/* Text columns wrap */
+.tickets-table td.col-subject,
+.tickets-table td.col-org,
+.tickets-table td.col-cat,
+.tickets-table td.col-dept{white-space: normal;}
+
+@media (max-width: 992px){
+  /* On small screens allow horizontal scroll and reduce some widths */
+  .tickets-table{table-layout:auto;}
+  .tickets-table thead th{position:static;}
+}
+.empty-state{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-sm)}
+.empty-title{font-weight:700;font-size:16px;margin-bottom:6px}
+.empty-text{color:var(--muted)}
+.empty-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+/* Responsive */
+@media (max-width: 1100px){
+  .filter-form .filter-grid{grid-template-columns: repeat(2, minmax(160px, 1fr));}
+  .filter-form .field-wide{grid-column: span 2;}
+}
+@media (max-width: 640px){
+  .filter-form .filter-grid{grid-template-columns: 1fr;}
+  .filter-form .field-wide{grid-column: auto;}
+}
+
+
+/* Pagination */
+.pagination{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content:center;
+  padding:14px 6px 6px;
+}
+.page-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:38px;
+  height:34px;
+  padding:0 10px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  text-decoration:none;
+  font-weight:700;
+  transition: transform .08s ease, box-shadow .12s ease, background-color .12s ease, border-color .12s ease;
+}
+.page-link:hover{transform:translateY(-1px); box-shadow:0 10px 22px rgba(0,0,0,.06);}
+.page-link.is-active{
+  background: var(--primary);
+  border-color: transparent;
+  color: #fff;
+}
+.page-link.is-disabled{
+  opacity:.45;
+  pointer-events:none;
+}
+.page-ellipsis{
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+.filter-actions .btn{flex:0 0 auto}
+@media (max-width:520px){.filter-actions{flex-direction:column;align-items:stretch}.filter-actions .btn{width:100%;justify-content:center}}
+
+
+/* =========================
+   Admin settings polish
+   ========================= */
+.settings-card{padding:0}
+.settings-card .card-body{padding:1rem}
+.settings-card h4,.settings-card h5{font-size:1rem;margin:.2rem 0 .6rem 0}
+.settings-card h6{font-size:.95rem;margin:.2rem 0 .6rem 0}
+.settings-card .accordion{margin-bottom:1rem}
+.settings-card .accordion-button{font-size:.92rem;padding:.55rem .75rem}
+.settings-card .accordion-body{padding:.9rem}
+
+/* Make action buttons stay on one line */
+.btn-group{display:flex;gap:.35rem;flex-wrap:nowrap;align-items:center}
+.btn-group .btn{white-space:nowrap}
+
+/* Compact table cells in settings */
+.settings-card .tickets-table thead th,
+.settings-card .tickets-table tbody td{padding:10px 12px;font-size:.9rem}
+.settings-card .tickets-table tbody td{white-space:nowrap}
+.settings-card .tickets-table tbody td.wrap{white-space:normal}
+
+/* Inline add forms (departments/tags/categories) */
+.inline-add{display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap}
+.inline-add .field{flex:1 1 260px;display:flex;flex-direction:column;gap:6px}
+.inline-add .btn{height:40px}
+
+/* Inline field (label + input in one line) */
+.inline-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.inline-field .form-label{margin:0;white-space:nowrap;font-size:.9rem;color:var(--muted)}
+.inline-field .input{flex:1 1 220px}
+
+/* Compact forms inside tables */
+.table-inline-form{display:flex;align-items:center;gap:.5rem;flex-wrap:nowrap}
+.tickets-table .input{height:34px;font-size:.9rem}
+.tickets-table td .input{min-width:220px;width:100%}
+
+/* Bitrix subtitle readability */
+.settings-card .muted-title{color:var(--muted);font-weight:650;font-size:.95rem}
+
+/* Gap utilities for legacy templates */
+.g-1{gap:.25rem !important}
+.g-2{gap:.5rem !important}
+.g-3{gap:1rem !important}
+.align-items-end{align-items:flex-end !important}
+.flex-wrap{flex-wrap:wrap !important}
+
+/* ---------------- Ticket view ---------------- */
+.ticket-view .ticket-title{font-weight:750}
+
+.section-title{font-weight:750;font-size:1rem;margin:0 0 .6rem 0}
+
+/* Ticket layout (without bootstrap grid) */
+.ticket-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:1rem;align-items:start}
+.ticket-main{min-width:0}
+.ticket-side{min-width:0}
+@media (max-width: 980px){
+  .ticket-layout{grid-template-columns:1fr}
+}
+.ticket-kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem .9rem}
+.ticket-kv .kv{display:flex;gap:.5rem;min-width:0}
+.ticket-kv .k{color:var(--muted);font-size:.82rem;min-width:92px}
+.ticket-kv .v{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width: 720px){.ticket-kv{grid-template-columns:1fr}.ticket-kv .k{min-width:78px}}
+
+.badge{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .55rem;border-radius:999px;font-size:.78rem;font-weight:700;border:1px solid var(--border)}
+.badge.pill{background:rgba(17,24,39,.03);color:#374151}
+.badge.success{background:rgba(22,163,74,.10);border-color:rgba(22,163,74,.22);color:var(--success)}
+.badge.info{background:rgba(14,165,233,.10);border-color:rgba(14,165,233,.22);color:var(--info)}
+.badge.danger{background:rgba(220,38,38,.10);border-color:rgba(220,38,38,.22);color:var(--danger)}
+
+.priority-pill{background:rgba(102,126,234,.10);border-color:rgba(102,126,234,.22);color:var(--primary)}
+
+.sidebar-kv{display:grid;gap:.6rem}
+.sidebar-kv > div{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;padding:.55rem .65rem;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.sidebar-kv span{color:var(--muted);font-size:.78rem}
+.sidebar-kv strong{font-weight:750;font-size:.84rem;flex:1;text-align:right;word-break:break-word;white-space:normal}
+.sidebar-kv .kv-small span{font-size:.72rem}
+.sidebar-kv .kv-small strong{font-size:.78rem;font-weight:700}
+
+.kv-copy{width:28px;height:28px;border-radius:10px;border:1px solid var(--border);background:rgba(17,24,39,.04);cursor:pointer;line-height:1;color:var(--text);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;opacity:1}
+.kv-copy .ico{width:16px;height:16px}
+.kv-copy:hover{background:rgba(17,24,39,.07)}
+.kv-copy:active{transform:translateY(1px)}
+
+/* Click-to-copy text in sidebar */
+.kv-copytext{cursor:pointer; text-decoration:none !important; color:inherit;}
+.kv-copytext:hover{opacity:.85;}
+
+/* Action button in sidebar (edit icon) */
+.kv-edit{width:28px;height:28px;border-radius:10px;border:1px solid var(--border);background:rgba(17,24,39,.04);cursor:pointer;line-height:1;color:var(--text);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;opacity:1}
+.kv-edit .ico{width:16px;height:16px}
+.kv-edit:hover{background:rgba(17,24,39,.07)}
+.kv-edit:active{transform:translateY(1px)}
+
+.notice{padding:.75rem .9rem;border:1px solid var(--border);border-radius:14px;background:var(--surface-2)}
+.notice.muted{color:var(--muted)}
+.notice-warning{border-color:rgba(245,158,11,.35);background:linear-gradient(180deg, rgba(245,158,11,.12), rgba(255,255,255,.0))}
+.notice-title{font-weight:800;margin-bottom:.15rem}
+.countdown{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-weight:800;font-size:1.05rem;letter-spacing:.5px;padding:.25rem .55rem;border-radius:10px;background:rgba(17,24,39,.06);display:inline-block}
+
+/* pinned header gradient defined ниже рядом с bbcode */
+
+/* Comments */
+.comment-compose{padding:1rem;border:1px dashed rgba(102,126,234,.35);border-radius:16px;background:linear-gradient(180deg, rgba(102,126,234,.06), rgba(255,255,255,0))}
+.comment-list{display:flex;flex-direction:column;gap:.9rem}
+.comment-item{border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-sm);padding:.9rem}
+.comment-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.6rem}
+.comment-who{display:flex;align-items:flex-start;gap:.7rem;min-width:0}
+.avatar{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:850;background:rgba(102,126,234,.12);color:var(--primary);border:1px solid rgba(102,126,234,.22);flex:0 0 auto}
+.comment-name{font-weight:800;line-height:1.1}
+.comment-meta{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.25rem}
+.comment-time{color:var(--muted);font-size:.82rem;white-space:nowrap}
+.comment-body{margin:.5rem 0 .65rem 0;word-break:break-word;overflow-wrap:anywhere}
+.comment-actions{display:flex;gap:.5rem;flex-wrap:wrap;padding-top:.6rem;border-top:1px solid var(--border)}
+
+.comment-attachments{margin-top:.6rem;padding-top:.6rem;border-top:1px dashed var(--border)}
+.comment-images{display:flex;flex-wrap:wrap;gap:.5rem}
+.comment-images img{width:84px;height:84px;object-fit:cover;border-radius:12px;border:1px solid var(--border);cursor:pointer;transition:transform .12s ease, box-shadow .12s ease}
+.comment-images img:hover{transform:scale(1.02);box-shadow:0 10px 24px rgba(17,24,39,.10)}
+.documents-inline{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+.doc-link{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .55rem;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);font-size:.85rem;color:#374151}
+.doc-link:hover{background:#eef2ff;text-decoration:none}
+
+/* Attachments in ticket */
+.attachments-title{font-weight:800;margin-bottom:.5rem}
+.image-thumbnails{display:flex;flex-wrap:wrap;gap:.6rem}
+.image-thumbnails a{border:1px solid var(--border);border-radius:14px;overflow:hidden;display:block;box-shadow:var(--shadow-sm)}
+.image-thumbnails img{width:110px;height:110px;object-fit:cover;display:block}
+.documents-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.45rem}
+.documents-list a{display:flex;align-items:center;justify-content:space-between;padding:.55rem .7rem;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);color:#374151}
+.documents-list a:hover{background:#eef2ff;text-decoration:none}
+
+/* Sidebar pills */
+.kv-pill{display:inline-block;padding:.22rem .55rem;border:1px solid var(--border);border-radius:999px;background:var(--surface-2);font-weight:600;color:#111827;}
+
+/* Image modal (ticket + comments) */
+.image-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:2000;padding:24px;}
+.image-modal.active{display:flex;}
+.modal-image-container{position:relative;max-width:min(1100px, 96vw);max-height:92vh;background:#111827;border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.35);padding:14px;}
+.modal-image{display:block;max-width:100%;max-height:78vh;border-radius:12px;object-fit:contain;background:#0b1220;}
+.modal-caption{margin-top:10px;color:#e5e7eb;font-size:13px;opacity:.9;word-break:break-word;}
+.modal-close{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:22px;line-height:1;}
+.modal-close:hover{background:rgba(255,255,255,.20);}
+
+
+
+/* Ticket view tweaks */
+.ticket-view .row.g-4{align-items:flex-start;}
+.ticket-meta-inline{margin:12px 0 18px; font-size:12px; color: var(--muted, #6b7280);}
+.ticket-meta-inline .meta-line{display:flex; flex-wrap:wrap; gap:10px;}
+.ticket-meta-inline .meta-item .k{opacity:.75; margin-right:6px;}
+.ticket-meta-inline .meta-item .v{font-weight:500; color: var(--text, #111827);}
+.ticket-actions-bottom{margin-top:14px;}
+
+/* File picker */
+.file-picker{display:inline-flex; align-items:center; gap:10px;}
+.file-picker input[type=file]{position:absolute; left:-9999px; width:1px; height:1px;}
+
+/* File preview (used in create ticket + comments) */
+.file-preview{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding:10px;background:var(--surface-2);border-radius:12px;border:1px solid var(--border);}
+.file-preview .file-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border-radius:10px;border:1px solid var(--border);font-size:13px;color:var(--text,#111827);}
+
+/* BBCode toolbar */
+.bb-toolbar{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin:6px 0 8px;
+  padding:6px;
+  border:1px solid var(--border);
+  background:var(--surface-2);
+  border-radius:12px;
+}
+.bb-btn{
+  border:1px solid var(--border);
+  background:var(--surface);
+  color: var(--text);
+  border-radius:10px;
+  padding:6px 10px;
+  font-size:12px;
+  cursor:pointer;
+  line-height: 1;
+  transition: background .12s ease, border-color .12s ease, transform .12s ease;
+}
+.bb-btn:hover{background:var(--surface-2);}
+.bb-btn:active{transform: translateY(1px);}
+
+/* Rendered bbcode */
+.bb-quote{border-left:3px solid rgba(102,126,234,.45); padding:10px 12px; margin:10px 0; background:rgba(102,126,234,.08); border-radius:12px;}
+.bb-code{padding:12px; margin:10px 0; background:rgba(17,24,39,.06); border-radius:12px; overflow:auto;}
+.bb-code code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px;}
+.bb-list{margin:8px 0 8px 20px;}
+
+/* Comments */
+.comment-name{display:flex; align-items:center; gap:8px;}
+.comment-name .comment-user{font-weight:800;}
+.ico-client{opacity:.65}
+.ico-op{color:#0ea5e9}
+.badge.pinned{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(245,158,11,.35);
+  background:rgba(245,158,11,.12);
+  color:var(--text);
+  font-weight:800;
+  font-size:12px;
+  line-height:1;
+}
+.badge.pinned .ico{width:14px;height:14px}
+
+/* Pinned result header */
+.pinned .card-header{background:linear-gradient(180deg, rgba(245,158,11,.14), rgba(255,255,255,0));}
+html[data-theme="dark"] .pinned .card-header{background:linear-gradient(180deg, rgba(245,158,11,.18), rgba(0,0,0,0));}
+
+.unpin-btn{border-color: rgba(239,68,68,.35); color: rgba(239,68,68,.95);}
+.unpin-btn:hover{background: rgba(239,68,68,.10);}
+
+/* Dark theme: rendered bbcode */
+html[data-theme="dark"] .bb-code{background: rgba(148,163,184,.10); border-color: rgba(148,163,184,.22);}
+html[data-theme="dark"] .bb-quote{background: rgba(96,165,250,.10); border-left-color: rgba(96,165,250,.55);}
+
+.bb-editor{min-height:110px;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:10px 12px;outline:none}
+.bb-editor.is-empty:before{content:attr(data-placeholder);color:var(--muted)}
+.bb-code{border:1px dashed rgba(0,0,0,.18);padding:10px 12px;border-radius:12px;background:rgba(17,24,39,.04);white-space:pre-wrap}
+.comment-edit-actions{margin-top:10px;margin-bottom:22px}
+
+.edit-attachments{margin-top:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fafafa}
+.edit-attachments-title{font-size:12px;color:#6b7280;margin-bottom:6px}
+.edit-attachments-list{display:flex;flex-direction:column;gap:6px}
+.edit-attachment-item{display:flex;align-items:center;gap:8px;font-size:13px;color:#111827;cursor:pointer;user-select:none}
+.edit-attachment-item input{transform:translateY(1px)}
+.edit-attachment-name{line-height:1.2}
+.role-inline{font-size:12px; color: var(--muted, #6b7280);}
+.comment-edited{font-size:12px; color: var(--muted, #6b7280);}
+.comment-edit-form textarea{width:100%;}
+
+
+/* Контейнер топ-меню: ширина как у основного контента */
+@media (min-width: 1920px){
+  .topbar-container{width:100%;margin-inline:auto;padding-inline:1.25rem}
+}
+
+
+/* Flash: сверху по центру, не больше одного сообщения (рендерится один) */
+.hd-flash-center{
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1090;
+  min-width: 320px;
+  max-width: 760px;
+  width: calc(100% - 24px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.15);
+}
+
+
+/* ==== Flash: сверху по центру, максимум 1 сообщение ==== */
+.hd-flash{
+  position:fixed;
+  /* ниже липкого меню, чтобы не перекрывалось навигацией */
+  top:74px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:20000;
+  min-width:320px;
+  max-width:min(720px, calc(100vw - 32px));
+  padding:10px 14px;
+  border-radius:12px;
+  background:rgba(255,255,255,.92);
+  backdrop-filter: blur(10px);
+  border:1px solid var(--border);
+  box-shadow:var(--shadow);
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.hd-flash-text{flex:1}
+.hd-flash-close{
+  border:0;
+  background:transparent;
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+  opacity:.75;
+}
+.hd-flash-close:hover{opacity:1}
+.hd-flash-success{border-left:4px solid var(--success)}
+.hd-flash-warning{border-left:4px solid var(--warning)}
+.hd-flash-error,.hd-flash-danger{border-left:4px solid var(--danger)}
+.hd-flash-info{border-left:4px solid var(--info)}
+
+html[data-theme="dark"] .hd-flash{background:rgba(15,23,42,.92)}
+
+/* ==== Уведомления: колокольчик + dropdown ==== */
+.notif{position:relative;display:flex;align-items:center}
+.notif-btn{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:40px;height:40px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--muted);
+  cursor:pointer;
+}
+.notif-btn:hover{background:var(--surface-2);color:var(--text)}
+.notif-btn .ico{width:18px;height:18px;fill:currentColor}
+.notif-badge{
+  position:absolute;
+  top:-6px; right:-6px;
+  padding:2px 6px;
+  border-radius:999px;
+  font-size:11px;
+  background:#ff4d4f;
+  color:#fff;
+  border:2px solid rgba(0,0,0,.0);
+}
+
+/* универсальный helper */
+.hidden{display:none !important;}
+.notif-dropdown{
+  position:absolute;
+  top:46px;
+  right:0;
+  width:360px;
+  max-width:calc(100vw - 24px);
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:0 16px 40px rgba(0,0,0,.18);
+  overflow:hidden;
+}
+.notif-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 12px;
+  border-bottom:1px solid var(--border);
+}
+.notif-title{font-weight:600}
+.notif-action{
+  border:0;
+  background:transparent;
+  cursor:pointer;
+  color:var(--primary);
+  font-weight:600;
+}
+.notif-list{max-height:360px;overflow:auto}
+.notif-item{
+  display:block;
+  padding:10px 12px;
+  text-decoration:none;
+  color:inherit;
+  border-bottom:1px solid var(--border);
+}
+.notif-item:hover{background:var(--surface-2)}
+.notif-item.unread{background:color-mix(in oklab, var(--primary) 10%, var(--surface))}
+.notif-text{font-size:13px}
+.notif-time{font-size:11px;opacity:.65;margin-top:2px}
+.notif-empty{padding:14px 12px;opacity:.7}
+.notif-sep{
+  padding:8px 12px;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  color:rgba(0,0,0,.55);
+  background:rgba(0,0,0,.02);
+  border-bottom:1px solid var(--border);
+}
+
+/* ==== Топ-бар по ширине как основной контент ==== */
+.topbar-container{
+  max-width:1920px;
+  margin-inline:auto;
+  padding-inline:1.25rem;
+}
+@media (min-width: 992px){
+  .topbar-container{padding-inline:2rem;}
+}
+
+
+/* ---------------- Live toasts ---------------- */
+
+.hd-toasts{
+  position:fixed;
+  top:84px; /* ниже топ-бара */
+  left:50%;
+  transform:translateX(-50%);
+  z-index:20000;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  width:min(520px, calc(100vw - 24px));
+  pointer-events:none;
+}
+.hd-toast{
+  pointer-events:auto;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:0 10px 26px rgba(0,0,0,.10);
+  padding:12px 14px;
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  animation:hdToastIn .18s ease-out;
+}
+.hd-toast-info{border-left:4px solid var(--info);}
+.hd-toast-success{border-left:4px solid var(--success);}
+.hd-toast-danger{border-left:4px solid var(--danger);}
+.hd-toast-warning{border-left:4px solid var(--warning);}
+html[data-theme="dark"] .hd-toast{background:rgba(15,23,42,.92);}
+
+@keyframes hdToastIn{
+  from{opacity:0; transform:translateY(-6px);}
+  to{opacity:1; transform:translateY(0);}
+}
+.hd-toast-title{font-weight:700;color:var(--text);line-height:1.2}
+.hd-toast-body{color:var(--muted);font-size:.9rem;margin-top:2px}
+.hd-toast-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+.hd-toast-link{
+  font-size:.9rem;
+  padding:.35rem .55rem;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:rgba(102,126,234,.10);
+  color:var(--primary);
+  text-decoration:none;
+  white-space:nowrap;
+}
+.hd-toast-link:hover{background:rgba(102,126,234,.16);text-decoration:none}
+.hd-toast-close{
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  font-size:18px;
+  line-height:1;
+  color:var(--muted);
+  padding:0 2px;
+}
+
+
+.notif-foot{padding:10px 12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
+.notif-all{font-size:12px;color:var(--primary);text-decoration:none}
+.notif-all:hover{text-decoration:underline}
+
+.notifications-page-list{display:flex;flex-direction:column}
+.notif-row{display:flex;gap:14px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit}
+.notif-row:hover{background:var(--surface-2)}
+.notif-row{position:relative}
+.notif-row.unread{background:rgba(102,126,234,.06)}
+.notif-row.unread::before{content:\"\";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--primary);border-top-left-radius:12px;border-bottom-left-radius:12px;}
+.notif-row.unread .notif-row-title{font-weight:700}
+.notif-row-main{flex:1;min-width:0}
+.notif-row-title{font-size:14px;line-height:1.25}
+.notif-row-body{font-size:13px;color:var(--muted);margin-top:4px;white-space:pre-wrap}
+.notif-row-time{font-size:12px;color:var(--muted);white-space:nowrap}
+
+/* Fix: notifications dropdown must be above tables/content */
+.top-navbar{position:sticky;top:0;z-index:3000;}
+.notif{position:relative;z-index:3500;}
+.notif-dropdown{z-index:5000;}
+
+/* ==== Override: shared departments as plain text (no pill/border) ==== */
+.shared-depts{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  max-width:100%;
+}
+.shared-dept-item{
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  max-width:100%;
+  min-width:0;
+}
+.shared-dept-name{
+  flex:1 1 auto;
+  min-width:0;
+  max-width:100%;
+  overflow:visible !important;
+  text-overflow:unset !important;
+  white-space:normal !important;     /* allow wrapping */
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+.shared-dept-remove{
+  flex:0 0 auto;
+  border:none;
+  background:transparent;
+  padding:0 4px;
+  line-height:1;
+  font-size:18px;
+  color:rgba(0,0,0,.55);
+  cursor:pointer;
+}
+.shared-dept-remove:hover{color:rgba(0,0,0,.85);}
+
+/* Ensure long department names wrap inside ticket info */
+.ticket-right strong, .ticket-info strong{
+  overflow-wrap:anywhere;
+}
+
+
+/* Notifications page footer */
+.notifications-footer{
+  margin-top:16px;
+  padding:12px 14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:var(--surface);
+  color:var(--muted);
+  text-align:right;
+  font-size:13px;
+}
+.notifications-footer strong{color:var(--text)}
+
+
+/* Quick search in toolbar */
+.quick-search{display:flex;align-items:center}
+.input-sm{height:34px;padding:7px 10px;border-radius:12px;font-size:.9rem;min-width:240px;max-width:420px}
+@media (max-width: 720px){.input-sm{min-width:180px;max-width:100%}}
+
+/* Ticket detail header card */
+.ticket-header{padding:14px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
+.ticket-header-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ticket-title-wrap{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
+.ticket-title{
+  font-weight:750;
+  letter-spacing:-.2px;
+  max-width:100%;
+  /* как хедер у комментариев: без странного "съезда" и с аккуратным переносом */
+  white-space:normal;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  line-height:1.25;
+}
+.ticket-header-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.ticket-header-meta{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.meta-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);font-size:12px;line-height:1}
+.meta-pill strong{color:var(--text);font-weight:700}
+
+/* Comments (classic list, without bubble alignment) */
+.comment-list{display:block}
+.comment-item{
+  border:1px solid var(--border);
+  background:var(--surface);
+  border-radius:14px;
+  padding:10px 12px;
+  box-shadow:var(--shadow-sm);
+  margin:0 0 12px 0;
+  max-width:100%;
+}
+/* keep semantic classes but don't change layout */
+.comment-item.is-operator{background:var(--surface)}
+.comment-item.is-client{background:var(--surface)}
+.comment-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.comment-name{display:flex;align-items:center;gap:8px;font-weight:700}
+.comment-time{color:var(--muted);font-size:12px;white-space:nowrap}
+.comment-body{margin-top:8px}
+
+
+/* Make the presence/work indicators look consistent */
+#typingIndicator{padding:6px 10px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
+#workIndicator{border-radius:14px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.12);color:var(--text)}
+
+/* Sticky toolbar on TicketList */
+.page-toolbar{position:sticky;top:12px;z-index:50;backdrop-filter:blur(8px)}
+
+
+/* ---------------- Comments (Ticket detail) ---------------- */
+.comment-list{display:flex;flex-direction:column;gap:.65rem}
+.comment-item{border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:0 10px 26px rgba(15,23,42,.05);padding:.85rem .95rem}
+html[data-theme="dark"] .comment-item{box-shadow:0 16px 38px rgba(0,0,0,.25)}
+.comment-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:.45rem}
+.comment-name{display:flex;align-items:center;gap:.45rem;font-weight:700}
+.comment-meta{color:var(--muted);font-size:.82rem;margin-top:.15rem}
+.comment-text{white-space:pre-wrap;line-height:1.5}
+.comment-actions{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.65rem}
+/* Кнопки комментариев всегда видимы (не прячем на hover) */
+@media (min-width: 860px){
+  .comment-actions{opacity:1;pointer-events:auto}
+}
+.comment-images{display:flex;gap:10px;flex-wrap:wrap;margin-top:.55rem}
+.comment-images img{width:120px;height:84px;object-fit:cover;border-radius:12px;border:1px solid var(--border);cursor:zoom-in;box-shadow:0 8px 20px rgba(15,23,42,.06)}
+.documents-inline{display:flex;flex-wrap:wrap;gap:8px;margin-top:.55rem}
+.doc-link{display:inline-flex;align-items:center;gap:8px;padding:.38rem .55rem;border:1px solid var(--border);border-radius:999px;background:var(--surface-2);color:var(--text);font-size:.82rem}
+.doc-link:hover{background:color-mix(in oklab, var(--primary) 10%, var(--surface-2));text-decoration:none}
+
+/* Ticket detail: highlight important ticket like kanban */
+.ticket-main-card.is-important{border-color:color-mix(in oklab, #f59e0b 28%, var(--border));}
+.ticket-main-card.is-important > .card-header{background:color-mix(in oklab, #f59e0b 10%, var(--surface)); border-bottom-color:color-mix(in oklab, #f59e0b 18%, var(--border));}
+html[data-theme="dark"] .ticket-main-card.is-important > .card-header{background:color-mix(in oklab, #f59e0b 12%, rgba(15,23,42,.92));}
+
+
+
+/* -------- Dark theme fixes: nav links + tables + date picker icon -------- */
+html[data-theme="dark"] .top-navbar .nav-link{
+  color: rgba(255,255,255,.82);
+}
+html[data-theme="dark"] .top-navbar .nav-link:hover{
+  background: rgba(255,255,255,.08);
+  color: #ffffff;
+}
+html[data-theme="dark"] .top-navbar .nav-link.active{
+  background: rgba(255,255,255,.10);
+  color: #ffffff;
+}
+
+/* Tables in dark mode */
+html[data-theme="dark"] .table thead th{
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.78);
+  border-color: var(--border);
+}
+html[data-theme="dark"] .table td,
+html[data-theme="dark"] .table th{
+  border-color: var(--border);
+}
+html[data-theme="dark"] .table-hover tbody tr:hover{
+  background: rgba(255,255,255,.06);
+}
+html[data-theme="dark"] .table-striped tbody tr:nth-child(odd){
+  background: rgba(255,255,255,.03);
+}
+
+/* Date input calendar icon (Chromium/WebKit) */
+html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{
+  filter: invert(1);
+  opacity: .9;
+}
+
+/* -------- Ticket state indicators (Bitrix-like) -------- */
+.state-indicator{
+  display:inline-block;
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  margin-right:8px;
+  vertical-align:middle;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.18);
+}
+.state-indicator.orange{ background:#ff9800; }
+.state-indicator.yellow{ background:#ffd54f; }
+.state-indicator.green{ background:#7bc96f; }
+.state-indicator.blue{ background:#4c8bf5; }
+.state-indicator.black{ background:#444; }
+
+.state-legend{
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.state-legend .legend-title{
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.state-legend .legend-items{
+  display:flex;
+  flex-wrap:wrap;
+  gap: 10px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.state-legend .legend-item{
+  display:inline-flex;
+  align-items:center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* In tables keep indicator tight */
+.tickets-table .col-id .state-indicator{ margin-right:10px; }
+
+/* Bitrix-like legend placement (bottom-left) */
+.state-legend-fixed{
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  max-width: min(560px, calc(100vw - 32px));
+  z-index: 40;
+  margin: 0;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12);
+}
+@media (max-width: 768px){
+  .state-legend-fixed{
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: none;
+  }
+  .state-legend-fixed .legend-items{
+    white-space: normal;
+  }
+}
+
+
+.sidebar-kv > div.kv-deadline{align-items:flex-start}
+.sidebar-kv > div.kv-deadline strong{white-space:nowrap;word-break:normal}
+.sidebar-kv > div.kv-deadline .deadline-box{display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;min-width:0;flex:1}
+.sidebar-kv > div.kv-deadline .deadline-meta{font-size:.74rem;color:var(--muted);text-align:right;line-height:1.25;white-space:normal;word-break:normal;overflow-wrap:anywhere}
+
+
+/* SLA / Крайний срок: устойчивый layout для карточки и списка */
+.col-sla{white-space:nowrap;width:96px;}
+.tickets-table .col-sla .sla-chip{min-width:58px;padding:4px 10px;font-size:12px;font-weight:700;justify-content:center;}
+.sidebar-kv > div.kv-deadline{
+  display:grid !important;
+  grid-template-columns:minmax(120px,1fr) auto;
+  align-items:center !important;
+  column-gap:12px;
+}
+.sidebar-kv > div.kv-deadline > span{
+  display:block;
+  min-width:0;
+  line-height:1.25;
+}
+.sidebar-kv > div.kv-deadline .deadline-box,
+.kv-deadline .deadline-box{
+  display:flex !important;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:center;
+  gap:6px;
+  min-width:max-content;
+  flex:0 0 auto;
+}
+.sidebar-kv > div.kv-deadline .deadline-meta,
+.kv-deadline .deadline-meta{
+  font-size:.78rem;
+  color:var(--muted);
+  text-align:right;
+  line-height:1.2;
+  white-space:nowrap;
+  word-break:normal;
+  overflow-wrap:normal;
+}
+.sidebar-kv > div.kv-deadline .sla-chip,
+.kv-deadline .sla-chip{
+  display:inline-flex !important;
+  align-items:center;
+  justify-content:center;
+  align-self:flex-end;
+  min-width:72px;
+  padding:5px 12px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:700;
+  line-height:1;
+  letter-spacing:0;
+  white-space:nowrap;
+  word-break:normal;
+  overflow-wrap:normal;
+  text-indent:0;
+}
+@media (max-width: 480px){
+  .sidebar-kv > div.kv-deadline{grid-template-columns:1fr auto;}
+  .sidebar-kv > div.kv-deadline .deadline-meta{font-size:.74rem;}
+  .sidebar-kv > div.kv-deadline .sla-chip{min-width:64px;padding:5px 10px;font-size:12px;}
+}

@@ -1,0 +1,130 @@
+/* Operator chat: Telegram-like mini panel (only on ticket_detail) */
+.opchat-fab{
+  position:fixed;
+  right:22px;
+  bottom:22px;
+  width:52px;
+  height:52px;
+  border-radius:16px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  box-shadow:0 10px 25px rgba(0,0,0,.12);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  z-index:4000;
+  font-size:22px;
+}
+
+.opchat-badge{
+  position:absolute;
+  top:-6px;
+  right:-6px;
+  min-width:18px;
+  height:18px;
+  padding:0 5px;
+  border-radius:999px;
+  background:#e11d48;
+  color:#fff;
+  font-size:12px;
+  font-weight:800;
+  line-height:18px;
+  text-align:center;
+  box-shadow:0 6px 14px rgba(0,0,0,.18);
+}
+.opchat-panel{
+  position:fixed;
+  right:22px;
+  bottom:84px;
+  width:min(360px, calc(100vw - 44px));
+  height:520px;
+  background:var(--surface);
+  backdrop-filter:saturate(1.15) blur(10px);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:0 18px 40px rgba(0,0,0,.16);
+  overflow:hidden;
+  z-index:4000;
+  display:flex;
+  flex-direction:column;
+}
+.opchat-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 12px;
+  border-bottom:1px solid var(--border);
+}
+.opchat-locked{
+  padding:8px 12px;
+  font-size:12px;
+  color:var(--muted);
+  border-bottom:1px solid var(--border);
+  background:rgba(250, 204, 21, .12);
+}
+.opchat-title{font-weight:700;font-size:14px;color:var(--text)}
+.opchat-close{
+  border:0;
+  background:transparent;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  color:var(--muted);
+}
+.opchat-messages{
+  flex:1;
+  padding:12px;
+  overflow:auto;
+  background:linear-gradient(180deg, rgba(102,126,234,.06), rgba(17,24,39,0));
+}
+.opchat-empty{color:var(--muted);font-size:13px;text-align:center;margin-top:10px}
+.opchat-row{display:flex;margin:8px 0}
+.opchat-row.mine{justify-content:flex-end}
+.opchat-row.theirs{justify-content:flex-start}
+.opchat-bubble{
+  max-width:78%;
+  padding:10px 10px 8px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:var(--surface);
+}
+.opchat-row.mine .opchat-bubble{background:rgba(102,126,234,.12);border-color:rgba(102,126,234,.25)}
+.opchat-author{font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px}
+.opchat-text{font-size:13px;white-space:pre-wrap;word-break:break-word;color:var(--text)}
+.opchat-time{font-size:11px;color:var(--muted);margin-top:6px;text-align:right}
+.opchat-input{
+  display:flex;
+  gap:8px;
+  padding:10px;
+  border-top:1px solid var(--border);
+  background:var(--surface);
+}
+.opchat-input input{
+  flex:1;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:13px;
+  outline:none;
+  background:var(--surface);
+}
+.opchat-send{
+  border:1px solid rgba(102,126,234,.35);
+  background:rgba(102,126,234,.10);
+  color:#3844a3;
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+@media (max-height: 700px){
+  .opchat-panel{height:420px;}
+}
+
+
+/* Ensure native [hidden] works even if .opchat-panel has display:flex */
+.opchat-panel[hidden]{
+  display:none !important;
+}

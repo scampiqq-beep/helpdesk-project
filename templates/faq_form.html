@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from 'partials/svg.html' import svg %}
+
+{% block title %}{{ 'Добавить статью' if mode=='add' else 'Редактировать статью' }}{% endblock %}
+{% block page_title %}{{ 'Добавить статью' if mode=='add' else 'Редактировать статью' }}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <form method="POST" class="filter-form">
+      <div class="filter-grid" style="align-items:start">
+        <div class="field field-wide" style="grid-column:1/-1">
+          <label>Заголовок / Вопрос</label>
+          <input class="input" type="text" name="question" value="{{ faq.question if faq else '' }}" required>
+        </div>
+
+        <div class="field" style="min-width:220px">
+          <label>Категория</label>
+          <input class="input" type="text" name="category" value="{{ faq.category if faq and faq.category else 'Общее' }}">
+        </div>
+
+        <div class="field" style="max-width:180px">
+          <label>Порядок</label>
+          <input class="input" type="number" name="order" value="{{ faq.order if faq else 0 }}">
+        </div>
+
+        <div class="field" style="max-width:220px">
+          <label>Активна</label>
+          <select class="select" name="is_active">
+            <option value="1" {% if (faq and faq.is_active) or (not faq) %}selected{% endif %}>Да</option>
+            <option value="0" {% if faq and not faq.is_active %}selected{% endif %}>Нет</option>
+          </select>
+        </div>
+
+        <div class="field" style="grid-column:1/-1">
+          <label>Текст статьи</label>
+          <textarea class="textarea" name="answer" rows="10" required>{{ faq.answer if faq else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <button class="btn btn-primary btn-sm" type="submit">{{ svg('check','ico') }}Сохранить</button>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('knowledge') }}">Отмена</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
